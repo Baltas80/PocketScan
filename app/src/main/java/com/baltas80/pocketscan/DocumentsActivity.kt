@@ -63,7 +63,11 @@ class DocumentsActivity : AppCompatActivity() {
                 val target = File(file.parentFile, "$newName.pdf")
                 if (target.exists()) {
                     Toast.makeText(this, R.string.file_already_exists, Toast.LENGTH_SHORT).show()
-                } else if (file.renameTo(target)) {
+                    return@setPositiveButton
+                }
+                if (file.renameTo(target)) {
+                    File(file.parentFile, file.nameWithoutExtension + ".jpg")
+                        .renameTo(File(file.parentFile, "$newName.jpg"))
                     loadDocuments()
                 } else {
                     Toast.makeText(this, R.string.rename_failed, Toast.LENGTH_SHORT).show()
