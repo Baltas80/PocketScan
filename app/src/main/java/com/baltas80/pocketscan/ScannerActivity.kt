@@ -9,6 +9,7 @@ import android.graphics.pdf.PdfDocument
 import android.net.Uri
 import android.os.Bundle
 import android.widget.Button
+import android.widget.TextView
 import android.widget.Toast
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.appcompat.app.AppCompatActivity
@@ -31,11 +32,12 @@ import java.util.Locale
 
 class ScannerActivity : AppCompatActivity() {
     private lateinit var previewView: PreviewView
+    private lateinit var hint: TextView
     private var imageCapture: ImageCapture? = null
+    private val capturedPages = mutableListOf<File>()
+    private var busy = false
 
-    private val permissionLauncher = registerForActivityResult(
-        ActivityResultContracts.RequestPermission()
-    ) { granted ->
+    private val permissionLauncher = registerForActivityResult(ActivityResultContracts.RequestPermission()) { granted ->
         if (granted) startCamera() else {
             Toast.makeText(this, R.string.camera_permission_required, Toast.LENGTH_LONG).show()
             finish()
@@ -46,25 +48,20 @@ class ScannerActivity : AppCompatActivity() {
         super.onCreate(savedInstanceState)
         setContentView(R.layout.activity_scanner)
         previewView = findViewById(R.id.previewView)
-        findViewById<Button>(R.id.captureButton).setOnClickListener { takePhoto() }
+        hint = findViewById(R.id.scanHint)
+        findViewById<Button>(R.id.captureButton).setOnClickListener { takePage() }
+        findViewById<Button>(R.id.finishButton).setOnClickListener { finishPdf() }
 
-        if (ContextCompat.checkSelfPermission(this, Manifest.permission.CAMERA) == PackageManager.PERMISSION_GRANTED) {
-            startCamera()
-        } else {
-            permissionLauncher.launch(Manifest.permission.CAMERA)
-        }
+        if (ContextCompat.checkSelfPermission(this, Manifest.permission.CAMERA) == PackageManager.PERMISSION_GRANTED) startCamera()
+        else permissionLauncher.launch(Manifest.permission.CAMERA)
     }
 
     private fun startCamera() {
-        val cameraProviderFuture = ProcessCameraProvider.getInstance(this)
-        cameraProviderFuture.addListener({
-            val provider = cameraProviderFuture.get()
-            val preview = Preview.Builder().build().also {
-                it.surfaceProvider = previewView.surfaceProvider
-            }
-            imageCapture = ImageCapture.Builder()
-                .setCaptureMode(ImageCapture.CAPTURE_MODE_MINIMIZE_LATENCY)
-                .build()
+        val future = ProcessCameraProvider.getInstance(this)
+        future.addListener({
+            val provider = future.get()
+            val preview = Preview.Builder().build().also { it.surfaceProvider = previewView.surfaceProvider }
+            imageCapture = ImageCapture.Builder().setCaptureMode(ImageCapture.CAPTURE_MODE_MINIMIZE_LATENCY).build()
             try {
                 provider.unbindAll()
                 provider.bindToLifecycle(this, CameraSelector.DEFAULT_BACK_CAMERA, preview, imageCapture)
@@ -74,77 +71,94 @@ class ScannerActivity : AppCompatActivity() {
         }, ContextCompat.getMainExecutor(this))
     }
 
-    private fun takePhoto() {
+    private fun takePage() {
+        if (busy) return
         val capture = imageCapture ?: return
-        val scansDir = File(filesDir, "scans").apply { mkdirs() }
-        val stamp = SimpleDateFormat("yyyyMMdd_HHmmss", Locale.US).format(Date())
-        val photoFile = File(scansDir, "scan_$stamp.jpg")
-        val output = ImageCapture.OutputFileOptions.Builder(photoFile).build()
-
-        capture.takePicture(output, ContextCompat.getMainExecutor(this), object : ImageCapture.OnImageSavedCallback {
+        val dir = File(filesDir, "scans").apply { mkdirs() }
+        val stamp = SimpleDateFormat("yyyyMMdd_HHmmss_SSS", Locale.US).format(Date())
+        val photo = File(dir, "page_$stamp.jpg")
+        busy = true
+        capture.takePicture(ImageCapture.OutputFileOptions.Builder(photo).build(), ContextCompat.getMainExecutor(this), object : ImageCapture.OnImageSavedCallback {
             override fun onError(exception: ImageCaptureException) {
+                busy = false
                 Toast.makeText(this@ScannerActivity, exception.message ?: "Capture failed", Toast.LENGTH_LONG).show()
             }
-
             override fun onImageSaved(outputFileResults: ImageCapture.OutputFileResults) {
-                val pdfFile = File(scansDir, "scan_$stamp.pdf")
-                try {
-                    createPdf(photoFile, pdfFile)
-                    runOcr(photoFile, File(scansDir, "scan_$stamp.txt"))
-                    Toast.makeText(this@ScannerActivity, getString(R.string.saved_as_pdf), Toast.LENGTH_SHORT).show()
-                } catch (e: Exception) {
-                    Toast.makeText(this@ScannerActivity, e.message ?: "PDF creation failed", Toast.LENGTH_LONG).show()
-                }
+                capturedPages.add(photo)
+                busy = false
+                hint.text = "Página ${capturedPages.size} capturada. Puedes añadir otra o finalizar."
             }
         })
     }
 
-    private fun runOcr(imageFile: File, textFile: File) {
+    private fun finishPdf() {
+        if (busy || capturedPages.isEmpty()) {
+            if (capturedPages.isEmpty()) Toast.makeText(this, "Captura al menos una página", Toast.LENGTH_SHORT).show()
+            return
+        }
+        val dir = File(filesDir, "scans")
+        val stamp = SimpleDateFormat("yyyyMMdd_HHmmss", Locale.US).format(Date())
+        val pdf = File(dir, "document_$stamp.pdf")
+        val text = File(dir, "document_$stamp.txt")
         try {
-            val image = InputImage.fromFilePath(this, Uri.fromFile(imageFile))
-            val recognizer = TextRecognition.getClient(TextRecognizerOptions.DEFAULT_OPTIONS)
-            recognizer.process(image)
-                .addOnSuccessListener { result ->
-                    textFile.writeText(result.text, Charsets.UTF_8)
-                    recognizer.close()
-                }
-                .addOnFailureListener {
-                    recognizer.close()
-                }
-        } catch (_: Exception) {
-            // OCR is an enhancement; the PDF remains available if recognition cannot start.
+            createPdf(capturedPages, pdf)
+            runOcr(capturedPages, text)
+            capturedPages.forEach { it.delete() }
+            Toast.makeText(this, "PDF guardado", Toast.LENGTH_SHORT).show()
+            finish()
+        } catch (e: Exception) {
+            Toast.makeText(this, e.message ?: "No se pudo crear el PDF", Toast.LENGTH_LONG).show()
         }
     }
 
-    private fun createPdf(imageFile: File, pdfFile: File) {
-        val source = BitmapFactory.decodeFile(imageFile.absolutePath)
-            ?: error("Unable to decode captured image")
-        val bitmap = applyExifRotation(imageFile, source)
+    private fun runOcr(files: List<File>, textFile: File) {
+        val recognizer = TextRecognition.getClient(TextRecognizerOptions.DEFAULT_OPTIONS)
+        val all = StringBuilder()
+        fun next(index: Int) {
+            if (index >= files.size) {
+                textFile.writeText(all.toString(), Charsets.UTF_8)
+                recognizer.close()
+                return
+            }
+            try {
+                val image = InputImage.fromFilePath(this, Uri.fromFile(files[index]))
+                recognizer.process(image).addOnSuccessListener { result ->
+                    if (result.text.isNotBlank()) {
+                        if (all.isNotEmpty()) all.append("\n\n")
+                        all.append(result.text)
+                    }
+                    next(index + 1)
+                }.addOnFailureListener { next(index + 1) }
+            } catch (_: Exception) { next(index + 1) }
+        }
+        next(0)
+    }
+
+    private fun createPdf(files: List<File>, pdfFile: File) {
         val document = PdfDocument()
-        val pageInfo = PdfDocument.PageInfo.Builder(595, 842, 1).create()
-        val page = document.startPage(pageInfo)
-        val canvas = page.canvas
-        val margin = 24f
-        val maxWidth = 595f - margin * 2
-        val maxHeight = 842f - margin * 2
-        val scale = minOf(maxWidth / bitmap.width, maxHeight / bitmap.height)
-        val width = bitmap.width * scale
-        val height = bitmap.height * scale
-        val left = (595f - width) / 2f
-        val top = (842f - height) / 2f
-        canvas.drawBitmap(bitmap, null, android.graphics.RectF(left, top, left + width, top + height), null)
-        document.finishPage(page)
-        FileOutputStream(pdfFile).use { document.writeTo(it) }
-        document.close()
-        if (bitmap !== source) source.recycle()
-        bitmap.recycle()
+        try {
+            files.forEachIndexed { index, file ->
+                val source = BitmapFactory.decodeFile(file.absolutePath) ?: error("No se pudo leer la imagen")
+                val bitmap = applyExifRotation(file, source)
+                val pageInfo = PdfDocument.PageInfo.Builder(595, 842, index + 1).create()
+                val page = document.startPage(pageInfo)
+                val margin = 24f
+                val scale = minOf((595f - margin * 2) / bitmap.width, (842f - margin * 2) / bitmap.height)
+                val width = bitmap.width * scale
+                val height = bitmap.height * scale
+                val left = (595f - width) / 2f
+                val top = (842f - height) / 2f
+                page.canvas.drawBitmap(bitmap, null, android.graphics.RectF(left, top, left + width, top + height), null)
+                document.finishPage(page)
+                if (bitmap !== source) source.recycle()
+                bitmap.recycle()
+            }
+            FileOutputStream(pdfFile).use { document.writeTo(it) }
+        } finally { document.close() }
     }
 
     private fun applyExifRotation(file: File, bitmap: Bitmap): Bitmap {
-        val orientation = ExifInterface(file.absolutePath).getAttributeInt(
-            ExifInterface.TAG_ORIENTATION,
-            ExifInterface.ORIENTATION_NORMAL
-        )
+        val orientation = ExifInterface(file.absolutePath).getAttributeInt(ExifInterface.TAG_ORIENTATION, ExifInterface.ORIENTATION_NORMAL)
         val degrees = when (orientation) {
             ExifInterface.ORIENTATION_ROTATE_90 -> 90f
             ExifInterface.ORIENTATION_ROTATE_180 -> 180f
@@ -152,7 +166,6 @@ class ScannerActivity : AppCompatActivity() {
             else -> 0f
         }
         if (degrees == 0f) return bitmap
-        val matrix = Matrix().apply { postRotate(degrees) }
-        return Bitmap.createBitmap(bitmap, 0, 0, bitmap.width, bitmap.height, matrix, true)
+        return Bitmap.createBitmap(bitmap, 0, 0, bitmap.width, bitmap.height, Matrix().apply { postRotate(degrees) }, true)
     }
 }
