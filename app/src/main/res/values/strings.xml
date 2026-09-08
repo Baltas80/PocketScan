@@ -1,0 +1,14 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="app_name">PocketScan</string>
+    <string name="camera_permission_required">Se necesita permiso de cámara para escanear.</string>
+    <string name="saved_as_pdf">Documento guardado como PDF.</string>
+    <string name="share_document">Compartir documento</string>
+    <string name="rename_document">Renombrar documento</string>
+    <string name="rename">Renombrar</string>
+    <string name="delete_document">Borrar documento</string>
+    <string name="delete">Borrar</string>
+    <string name="file_already_exists">Ya existe un documento con ese nombre.</string>
+    <string name="rename_failed">No se pudo renombrar.</string>
+    <string name="delete_failed">No se pudo borrar.</string>
+</resources>
