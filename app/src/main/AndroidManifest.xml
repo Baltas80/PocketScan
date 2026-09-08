@@ -8,6 +8,10 @@
         android:supportsRtl="true"
         android:theme="@style/Theme.PocketScan">
 
+        <meta-data
+            android:name="com.google.mlkit.vision.DEPENDENCIES"
+            android:value="ocr" />
+
         <activity android:name=".DocumentsActivity" />
         <activity android:name=".ScannerActivity" />
         <activity
