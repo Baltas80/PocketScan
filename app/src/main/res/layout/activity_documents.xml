@@ -12,6 +12,15 @@
         android:textSize="24sp"
         android:textStyle="bold" />
 
+    <EditText
+        android:id="@+id/searchInput"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_marginHorizontal="12dp"
+        android:hint="Buscar por nombre o texto OCR"
+        android:inputType="text"
+        android:singleLine="true" />
+
     <androidx.recyclerview.widget.RecyclerView
         android:id="@+id/documentsRecycler"
         android:layout_width="match_parent"
