@@ -6,6 +6,7 @@ import android.graphics.Bitmap
 import android.graphics.BitmapFactory
 import android.graphics.Matrix
 import android.graphics.pdf.PdfDocument
+import android.net.Uri
 import android.os.Bundle
 import android.widget.Button
 import android.widget.Toast
@@ -19,6 +20,9 @@ import androidx.camera.lifecycle.ProcessCameraProvider
 import androidx.camera.view.PreviewView
 import androidx.core.content.ContextCompat
 import androidx.exifinterface.media.ExifInterface
+import com.google.mlkit.vision.common.InputImage
+import com.google.mlkit.vision.text.TextRecognition
+import com.google.mlkit.vision.text.latin.TextRecognizerOptions
 import java.io.File
 import java.io.FileOutputStream
 import java.text.SimpleDateFormat
@@ -86,12 +90,30 @@ class ScannerActivity : AppCompatActivity() {
                 val pdfFile = File(scansDir, "scan_$stamp.pdf")
                 try {
                     createPdf(photoFile, pdfFile)
+                    runOcr(photoFile, File(scansDir, "scan_$stamp.txt"))
                     Toast.makeText(this@ScannerActivity, getString(R.string.saved_as_pdf), Toast.LENGTH_SHORT).show()
                 } catch (e: Exception) {
                     Toast.makeText(this@ScannerActivity, e.message ?: "PDF creation failed", Toast.LENGTH_LONG).show()
                 }
             }
         })
+    }
+
+    private fun runOcr(imageFile: File, textFile: File) {
+        try {
+            val image = InputImage.fromFilePath(this, Uri.fromFile(imageFile))
+            val recognizer = TextRecognition.getClient(TextRecognizerOptions.DEFAULT_OPTIONS)
+            recognizer.process(image)
+                .addOnSuccessListener { result ->
+                    textFile.writeText(result.text, Charsets.UTF_8)
+                    recognizer.close()
+                }
+                .addOnFailureListener {
+                    recognizer.close()
+                }
+        } catch (_: Exception) {
+            // OCR is an enhancement; the PDF remains available if recognition cannot start.
+        }
     }
 
     private fun createPdf(imageFile: File, pdfFile: File) {
