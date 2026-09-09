@@ -12,6 +12,13 @@
         android:textSize="24sp"
         android:textStyle="bold" />
 
+    <Button
+        android:id="@+id/importButton"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_marginHorizontal="12dp"
+        android:text="Importar imágenes" />
+
     <EditText
         android:id="@+id/searchInput"
         android:layout_width="match_parent"
