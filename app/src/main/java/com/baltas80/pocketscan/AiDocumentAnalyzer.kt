@@ -133,19 +133,45 @@ object AiDocumentAnalyzer {
         }
         val usefulLine = text.lineSequence()
             .map { it.trim() }
-            .firstOrNull { it.length >= 4 && !it.equals(type, true) && !it.matches(Regex("[0-9 ./,:-]+")) }
-        val title = usefulLine?.replace(Regex("\\s+"), " ")?.take(70)?.ifBlank { type } ?: file.nameWithoutExtension
+            .firstOrNull {
+                it.length >= 4 &&
+                    it.any(Char::isLetter) &&
+                    it.count(Char::isDigit) < it.length / 2 &&
+                    !it.equals(type, true)
+            }
+        val title = usefulLine
+            ?.replace(Regex("\\s+"), " ")
+            ?.take(70)
+            ?.ifBlank { "$type - ${file.nameWithoutExtension}" }
+            ?: "$type - ${file.nameWithoutExtension}"
+
         val fields = linkedMapOf<String, String>()
-        firstMatch(text, Regex("(?i)\\b(?:total|importe total|total amount|montant total|gesamtbetrag|totale)\\s*[:€]?\\s*([0-9.,]+)"))?.let { fields["total"] = it }
-        firstMatch(text, Regex("(?i)\\b(?:iva|vat|tva|mwst)\\s*[:%]?\\s*([0-9.,]+\\s*%?)"))?.let { fields["iva"] = it }
+        firstMatch(text, Regex("(?i)\\b(?:total|importe total|total amount|montant total|gesamtbetrag|totale)\\s*[:=]?\\s*([0-9][0-9.,]*)\\s*(€|EUR|USD|\\$|GBP|£)?"))?.let { value ->
+            fields["total"] = value
+            val currency = Regex("(?i)(EUR|USD|GBP|€|\\$|£)").find(value)?.value.orEmpty()
+            if (currency.isNotBlank()) fields["moneda"] = normalizeCurrency(currency)
+        }
+        firstMatch(text, Regex("(?i)\\b(?:iva|vat|tva|mwst)\\s*[:=]?\\s*([0-9.,]+\\s*%?)"))?.let { fields["iva"] = it }
         firstMatch(text, Regex("(?i)\\b(?:fecha|date|datum|data)\\s*[:.-]?\\s*(\\d{1,2}[/-]\\d{1,2}[/-]\\d{2,4})"))?.let { fields["fecha"] = it }
-        firstMatch(text, Regex("(?i)\\b(?:nif|cif|vat|tax id)\\s*[:.-]?\\s*([A-Z]?[0-9]{7,9}[A-Z]?)"))?.let { fields["nif_cif"] = it }
-        val summary = if (text.isBlank()) "No OCR available for a more precise local analysis." else text.replace(Regex("\\s+"), " ").trim().take(500)
+        firstMatch(text, Regex("(?i)\\b(?:nif|cif|nie|vat|tax id)\\s*[:.-]?\\s*([A-Z]?[0-9]{7,9}[A-Z]?)"))?.let { fields["nif_cif"] = it }
+
+        val summary = if (text.isBlank()) {
+            "No OCR disponible para un análisis local más preciso."
+        } else {
+            text.replace(Regex("\\s+"), " ").trim().take(700)
+        }
         return Analysis(category, title, summary, fields)
     }
 
     private fun firstMatch(text: String, regex: Regex): String? =
         regex.find(text)?.groupValues?.getOrNull(1)?.trim()?.takeIf { it.isNotEmpty() }
+
+    private fun normalizeCurrency(value: String): String = when (value.uppercase(Locale.ROOT)) {
+        "€", "EUR" -> "EUR"
+        "$", "USD" -> "USD"
+        "£", "GBP" -> "GBP"
+        else -> value
+    }
 
     private fun normalizeCategory(value: String): String = when (value.trim().uppercase(Locale.ROOT)) {
         "FACTURAS" -> DocumentOrganizer.FACTURAS
