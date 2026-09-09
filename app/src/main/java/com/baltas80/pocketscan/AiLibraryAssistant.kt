@@ -1,33 +1,23 @@
 package com.baltas80.pocketscan
 
+import android.content.Context
 import com.google.firebase.Firebase
+import com.google.firebase.ai.GenerativeBackend
 import com.google.firebase.ai.GenerativeModel
 import com.google.firebase.ai.ai
-import com.google.firebase.ai.type.GenerativeBackend
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
-import java.io.File
+import java.text.NumberFormat
 import java.util.Locale
 
 object AiLibraryAssistant {
-    suspend fun ask(filesDir: File, question: String): Result<String> = withContext(Dispatchers.IO) {
-        runCatching {
-            val scans = File(filesDir, "scans")
-            if (!scans.isDirectory) return@runCatching noDocumentsMessage()
-
-            val documents = scans.walkTopDown()
-                .filter { it.isFile && it.extension.equals("pdf", true) }
-                .toList()
-            if (documents.isEmpty()) return@runCatching noDocumentsMessage()
-
-            val queryResult = AiLibraryQueryEngine.query(question, documents)
-            if (queryResult.matches.isEmpty()) return@runCatching insufficientMessage(languageCode())
-
-            val context = AiLibraryQueryEngine.buildContext(queryResult).take(30000)
-            tryCloud(question, context).getOrElse {
-                localAnswer(question, queryResult, context)
-            }
+    suspend fun ask(context: Context, question: String): String = withContext(Dispatchers.IO) {
+        val documents = DocumentsRepository.list(context)
+        val result = AiLibraryQueryEngine.query(question, documents)
+        val localContext = result.matches.joinToString("\n") { document ->
+            "- ${document.name} | ${document.category ?: ""} | ${document.date ?: ""} | ${document.amount ?: ""} ${document.currency ?: ""}"
         }
+        tryCloud(question, localContext).getOrElse { localAnswer(question, result, localContext) }
     }
 
     private suspend fun tryCloud(question: String, context: String): Result<String> = runCatching {
@@ -36,27 +26,26 @@ object AiLibraryAssistant {
         val language = languageName()
         val prompt = """
             You are PocketScan's document library assistant.
-            Answer ONLY from the structured library results supplied below. Never invent facts.
-            Respect the filters already applied by the local query engine.
-            If an aggregate total is supplied, use it exactly and do not recalculate it from unrelated values.
-            You may summarize, compare, count, and identify dates, suppliers, clients, categories and amounts.
-            Respond in the user's language: $language. Keep the answer concise and useful.
-
-            USER QUESTION:
-            $question
-
-            STRUCTURED LIBRARY RESULTS:
+            Answer in $language using only the supplied library context.
+            If the context does not contain enough information, say so clearly.
+            Be concise and factual.
+            User question: $question
+            Library context:
             $context
         """.trimIndent()
         model.generateContent(prompt).text?.trim()?.takeIf { it.isNotBlank() } ?: error("AI returned no answer")
     }
 
-    private fun localAnswer(question: String, result: AiLibraryQueryEngine.Result, context: String): String {
+    private fun localAnswer(
+        question: String,
+        result: AiLibraryQueryEngine.Result,
+        context: String
+    ): String {
         val language = languageCode()
         val normalizedQuestion = normalize(question)
         val asksTotal = normalizedQuestion.contains("total") || normalizedQuestion.contains("cuanto") || normalizedQuestion.contains("suma") || normalizedQuestion.contains("sum")
-        if (asksTotal && result.aggregateTotal != null && result.aggregateCurrency != null) {
-            val formatted = "%.2f".format(Locale.US, result.aggregateTotal)
+        if (asksTotal && result.matches.isNotEmpty()) {
+            val formatted = NumberFormat.getNumberInstance(Locale.getDefault()).format(result.aggregateAmount)
             return when (language) {
                 "es" -> "Total de los ${result.matches.size} documentos encontrados: $formatted ${result.aggregateCurrency}."
                 "fr" -> "Total des ${result.matches.size} documents trouvés : $formatted ${result.aggregateCurrency}."
@@ -76,49 +65,20 @@ object AiLibraryAssistant {
             "ca" -> "La IA al núvol no està disponible. Resultats locals:"
             else -> "Cloud AI is unavailable. Local results:"
         }
-        return "$heading\n\n${context.take(12000)}"
+        return "$heading\n$context"
     }
-
-    private fun noDocumentsMessage(): String = when (languageCode()) {
-        "es" -> "No hay documentos indexados todavía."
-        "fr" -> "Aucun document n’est encore indexé."
-        "de" -> "Noch keine Dokumente indiziert."
-        "it" -> "Nessun documento indicizzato."
-        "pt" -> "Ainda não existem documentos indexados."
-        "ca" -> "Encara no hi ha documents indexats."
-        else -> "There are no indexed documents yet."
-    }
-
-    private fun insufficientMessage(language: String): String = when (language) {
-        "es" -> "No encuentro información suficiente en la biblioteca para responder a esa pregunta."
-        "fr" -> "Je ne trouve pas suffisamment d’informations dans la bibliothèque pour répondre."
-        "de" -> "Ich finde in der Bibliothek nicht genügend Informationen für diese Frage."
-        "it" -> "Non trovo informazioni sufficienti nella libreria per rispondere."
-        "pt" -> "Não encontro informação suficiente na biblioteca para responder."
-        "ca" -> "No trobo prou informació a la biblioteca per respondre."
-        else -> "I cannot find enough information in the library to answer that question."
-    }
-
-    private fun languageCode(): String = Locale.getDefault().language.lowercase(Locale.ROOT)
 
     private fun languageName(): String = when (languageCode()) {
-        "es" -> "Spanish"
-        "en" -> "English"
+        "es" -> "Spanish (Spain)"
         "fr" -> "French"
         "de" -> "German"
         "it" -> "Italian"
         "pt" -> "Portuguese"
         "ca" -> "Catalan"
-        "ar" -> "Arabic"
-        "nl" -> "Dutch"
-        "pl" -> "Polish"
-        "tr" -> "Turkish"
-        "ja" -> "Japanese"
-        "ko" -> "Korean"
-        "zh" -> "Chinese"
-        "ru" -> "Russian"
         else -> "English"
     }
+
+    private fun languageCode(): String = Locale.getDefault().language.lowercase(Locale.ROOT)
 
     private fun normalize(value: String): String = java.text.Normalizer.normalize(
         value.lowercase(Locale.ROOT), java.text.Normalizer.Form.NFD
