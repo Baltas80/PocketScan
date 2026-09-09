@@ -11,7 +11,7 @@ class MainActivity : AppCompatActivity() {
         setContentView(R.layout.activity_main)
 
         findViewById<Button>(R.id.scanButton).setOnClickListener {
-            startActivity(Intent(this, ScannerActivity::class.java))
+            startActivity(Intent(this, SmartScannerActivity::class.java))
         }
         findViewById<Button>(R.id.documentsButton).setOnClickListener {
             startActivity(Intent(this, DocumentsActivity::class.java))
