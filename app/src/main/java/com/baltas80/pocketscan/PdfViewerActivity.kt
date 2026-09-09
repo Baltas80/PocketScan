@@ -103,7 +103,7 @@ class PdfViewerActivity : AppCompatActivity() {
         }
         val answer = TextView(this).apply {
             text = "La respuesta aparecerá aquí."
-            textIsSelectable = true
+            isTextSelectable = true
             setPadding(0, 16, 0, 0)
         }
         val container = android.widget.LinearLayout(this).apply {
