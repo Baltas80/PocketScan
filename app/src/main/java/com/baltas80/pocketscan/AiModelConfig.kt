@@ -12,16 +12,26 @@ object AiModelConfig {
     private const val MODEL_NAME_KEY = "ai_model_name"
     private const val DEFAULT_MODEL_NAME = "gemini-3.7-flash"
 
+    @Volatile
+    private var cachedModelName: String? = null
+
     suspend fun modelName(): String {
+        cachedModelName?.let { return it }
+
         val config = FirebaseRemoteConfig.getInstance()
-        config.setDefaultsAsync(mapOf(MODEL_NAME_KEY to DEFAULT_MODEL_NAME))
-        runCatching {
-            suspendCancellableCoroutine<Unit> { continuation ->
-                config.fetchAndActivate().addOnCompleteListener {
-                    if (continuation.isActive) continuation.resume(Unit)
+        val resolved = suspendCancellableCoroutine<String> { continuation ->
+            config.setDefaultsAsync(mapOf(MODEL_NAME_KEY to DEFAULT_MODEL_NAME))
+                .addOnCompleteListener {
+                    config.fetchAndActivate().addOnCompleteListener {
+                        val model = config.getString(MODEL_NAME_KEY)
+                            .trim()
+                            .ifBlank { DEFAULT_MODEL_NAME }
+                        if (continuation.isActive) continuation.resume(model)
+                    }
                 }
-            }
         }
-        return config.getString(MODEL_NAME_KEY).trim().ifBlank { DEFAULT_MODEL_NAME }
+
+        cachedModelName = resolved
+        return resolved
     }
 }
