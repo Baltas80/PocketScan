@@ -16,6 +16,7 @@ import androidx.recyclerview.widget.LinearLayoutManager
 import androidx.recyclerview.widget.RecyclerView
 import java.io.File
 import java.io.FileOutputStream
+import java.text.Normalizer
 
 class DocumentsActivity : AppCompatActivity() {
     private lateinit var recyclerView: RecyclerView
@@ -102,6 +103,8 @@ class DocumentsActivity : AppCompatActivity() {
             createPdfFromImages(tempFiles, pdf)
             runOcr(tempFiles, text) {
                 tempFiles.forEach { it.delete() }
+                val renamedPdf = autoNameDocument(pdf, text.readText(Charsets.UTF_8), "Documento importado")
+                if (renamedPdf != pdf) text.renameTo(File(dir, renamedPdf.nameWithoutExtension + ".txt"))
                 loadDocuments()
                 Toast.makeText(this, "Documento importado", Toast.LENGTH_SHORT).show()
             }
@@ -143,6 +146,54 @@ class DocumentsActivity : AppCompatActivity() {
             } catch (_: Exception) { next(index + 1) }
         }
         next(0)
+    }
+
+    private fun autoNameDocument(pdf: File, ocrText: String, fallback: String): File {
+        val dir = pdf.parentFile ?: return pdf
+        val candidate = suggestDocumentName(ocrText, fallback)
+        var target = File(dir, "$candidate.pdf")
+        var counter = 2
+        while (target.exists() && target.absolutePath != pdf.absolutePath) {
+            target = File(dir, "$candidate ($counter).pdf")
+            counter++
+        }
+        if (target.absolutePath == pdf.absolutePath || !pdf.renameTo(target)) return pdf
+        return target
+    }
+
+    private fun suggestDocumentName(text: String, fallback: String): String {
+        val lines = text.lines().map { it.trim() }.filter { it.length >= 4 }
+        val keywords = listOf(
+            "factura" to "Factura",
+            "invoice" to "Factura",
+            "presupuesto" to "Presupuesto",
+            "contrato" to "Contrato",
+            "recibo" to "Recibo",
+            "ticket" to "Ticket",
+            "nómina" to "Nomina",
+            "nomina" to "Nomina",
+            "certificado" to "Certificado",
+            "informe" to "Informe",
+            "cita" to "Cita"
+        )
+        val lower = text.lowercase()
+        val type = keywords.firstOrNull { lower.contains(it.first) }?.second ?: fallback
+        val usefulLine = lines.firstOrNull { line ->
+            val normalized = line.lowercase()
+            keywords.none { normalized == it.first } &&
+                !normalized.matches(Regex("[0-9 ./:-]+"))
+        } ?: type
+        val cleanLine = sanitizeFileName(usefulLine).take(45).trim().trim('.', '_', '-')
+        val base = if (cleanLine.length >= 4) "$type - $cleanLine" else type
+        return sanitizeFileName(base).take(80).trim().ifEmpty { "Documento" }
+    }
+
+    private fun sanitizeFileName(value: String): String {
+        val withoutAccents = Normalizer.normalize(value, Normalizer.Form.NFD)
+            .replace("\\p{InCombiningDiacriticalMarks}+".toRegex(), "")
+        return withoutAccents.replace(Regex("[^A-Za-z0-9 _()\-]"), "_")
+            .replace(Regex("\\s+"), " ")
+            .trim()
     }
 
     private fun renameDocument(file: File) {
