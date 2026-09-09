@@ -32,7 +32,7 @@ object AiLibraryAssistant {
 
     private suspend fun tryCloud(question: String, context: String): Result<String> = runCatching {
         val model: GenerativeModel = Firebase.ai(backend = GenerativeBackend.googleAI())
-            .generativeModel("gemini-3.8-flash")
+            .generativeModel(AiModelConfig.modelName())
         val language = languageName()
         val prompt = """
             You are PocketScan's document library assistant.
@@ -51,11 +51,7 @@ object AiLibraryAssistant {
         model.generateContent(prompt).text?.trim()?.takeIf { it.isNotBlank() } ?: error("AI returned no answer")
     }
 
-    private fun localAnswer(
-        question: String,
-        result: AiLibraryQueryEngine.Result,
-        context: String
-    ): String {
+    private fun localAnswer(question: String, result: AiLibraryQueryEngine.Result, context: String): String {
         val language = languageCode()
         val normalizedQuestion = normalize(question)
         val asksTotal = normalizedQuestion.contains("total") || normalizedQuestion.contains("cuanto") || normalizedQuestion.contains("suma") || normalizedQuestion.contains("sum")
@@ -71,13 +67,12 @@ object AiLibraryAssistant {
                 else -> "Total for the ${result.matches.size} matching documents: $formatted ${result.aggregateCurrency}."
             }
         }
-
         val heading = when (language) {
             "es" -> "La IA en la nube no está disponible. Resultados locales:"
             "fr" -> "L’IA cloud n’est pas disponible. Résultats locaux :"
             "de" -> "Cloud-KI ist nicht verfügbar. Lokale Ergebnisse:"
             "it" -> "L’IA cloud non è disponibile. Risultati locali:"
-            "pt" -> "A IA na nuvem não está disponível. Resultados locais:"
+            "pt" -> "A IA na nuvem não está disponible. Resultados locais:"
             "ca" -> "La IA al núvol no està disponible. Resultats locals:"
             else -> "Cloud AI is unavailable. Local results:"
         }
@@ -126,7 +121,6 @@ object AiLibraryAssistant {
     }
 
     private fun normalize(value: String): String = java.text.Normalizer.normalize(
-        value.lowercase(Locale.ROOT),
-        java.text.Normalizer.Form.NFD
+        value.lowercase(Locale.ROOT), java.text.Normalizer.Form.NFD
     ).replace("\\p{InCombiningDiacriticalMarks}+".toRegex(), "")
 }
