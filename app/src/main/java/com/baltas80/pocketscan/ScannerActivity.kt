@@ -53,6 +53,7 @@ class ScannerActivity : AppCompatActivity() {
         previewView = findViewById(R.id.previewView)
         hint = findViewById(R.id.scanHint)
         findViewById<Button>(R.id.captureButton).setOnClickListener { takePage() }
+        findViewById<Button>(R.id.removeButton).setOnClickListener { removeLastPage() }
         findViewById<Button>(R.id.finishButton).setOnClickListener { finishPdf() }
 
         if (ContextCompat.checkSelfPermission(this, Manifest.permission.CAMERA) == PackageManager.PERMISSION_GRANTED) startCamera()
@@ -95,10 +96,26 @@ class ScannerActivity : AppCompatActivity() {
                 override fun onImageSaved(outputFileResults: ImageCapture.OutputFileResults) {
                     capturedPages.add(photo)
                     busy = false
-                    hint.text = "Página ${capturedPages.size} capturada. Puedes añadir otra o finalizar."
+                    updatePageStatus()
                 }
             }
         )
+    }
+
+    private fun removeLastPage() {
+        if (busy || capturedPages.isEmpty()) return
+        capturedPages.removeLast().delete()
+        updatePageStatus()
+    }
+
+    private fun updatePageStatus() {
+        hint.text = if (capturedPages.isEmpty()) {
+            "Alinea el documento dentro del encuadre"
+        } else {
+            "${capturedPages.size} página(s) preparada(s). Puedes añadir otra, eliminar la última o finalizar."
+        }
+        findViewById<Button>(R.id.removeButton).isEnabled = capturedPages.isNotEmpty() && !busy
+        findViewById<Button>(R.id.finishButton).isEnabled = capturedPages.isNotEmpty() && !busy
     }
 
     private fun finishPdf() {
@@ -108,6 +125,7 @@ class ScannerActivity : AppCompatActivity() {
         }
 
         busy = true
+        updatePageStatus()
         hint.text = "Procesando documento…"
         val pages = capturedPages.toList()
         val dir = File(filesDir, "scans")
@@ -125,6 +143,7 @@ class ScannerActivity : AppCompatActivity() {
             }
         } catch (e: Exception) {
             busy = false
+            updatePageStatus()
             Toast.makeText(this, e.message ?: "No se pudo crear el PDF", Toast.LENGTH_LONG).show()
         }
     }
@@ -202,16 +221,10 @@ class ScannerActivity : AppCompatActivity() {
         }
     }
 
-    /**
-     * Lightweight offline document enhancement for the MVP.
-     * It keeps color information while increasing local contrast and reducing
-     * very dark/light extremes, making photographed pages easier to read.
-     */
     private fun enhanceDocument(input: Bitmap): Bitmap {
         val output = input.copy(Bitmap.Config.ARGB_8888, true)
         val pixels = IntArray(output.width * output.height)
         output.getPixels(pixels, 0, output.width, 0, 0, output.width, output.height)
-
         val contrast = 1.18f
         val brightness = 2f
         for (i in pixels.indices) {
