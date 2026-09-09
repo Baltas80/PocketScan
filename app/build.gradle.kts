@@ -57,6 +57,7 @@ dependencies {
     // Gemini through Firebase AI Logic.
     implementation(platform("com.google.firebase:firebase-bom:34.18.0"))
     implementation("com.google.firebase:firebase-ai")
+    implementation("com.google.firebase:firebase-config")
 
     // App Check: Play Integrity for production, Debug provider for local builds.
     implementation("com.google.firebase:firebase-appcheck-playintegrity")
