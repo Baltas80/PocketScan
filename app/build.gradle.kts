@@ -42,6 +42,7 @@ dependencies {
     implementation("androidx.recyclerview:recyclerview:1.3.2")
     implementation("androidx.biometric:biometric:1.1.0")
     implementation("com.google.android.material:material:1.12.0")
+    implementation("androidx.work:work-runtime-ktx:2.11.2")
     implementation("androidx.camera:camera-core:1.4.1")
     implementation("androidx.camera:camera-camera2:1.4.1")
     implementation("androidx.camera:camera-lifecycle:1.4.1")
@@ -57,6 +58,7 @@ dependencies {
     // Gemini through Firebase AI Logic.
     implementation(platform("com.google.firebase:firebase-bom:34.18.0"))
     implementation("com.google.firebase:firebase-ai")
+    implementation("com.google.firebase:firebase-config")
 
     // App Check: Play Integrity for production, Debug provider for local builds.
     implementation("com.google.firebase:firebase-appcheck-playintegrity")

@@ -22,7 +22,7 @@ object AiPdfAssistant {
             "Este PDF supera el límite de análisis IA directo."
         }
         val model: GenerativeModel = Firebase.ai(backend = GenerativeBackend.googleAI())
-            .generativeModel("gemini-3.8-flash")
+            .generativeModel(AiModelConfig.modelName())
         val prompt = content {
             inlineData(file.readBytes(), "application/pdf")
             text("""

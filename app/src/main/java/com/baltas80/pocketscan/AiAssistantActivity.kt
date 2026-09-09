@@ -33,21 +33,34 @@ class AiAssistantActivity : AppCompatActivity() {
         }
     }
 
-    override fun onResume() { super.onResume(); AppLockManager.authenticateIfNeeded(this) { finish() } }
+    override fun onResume() {
+        super.onResume()
+        AppLockManager.authenticateIfNeeded(this) { finish() }
+    }
 
     private fun ask() {
         val question = questionInput.text.toString().trim()
-        if (question.isBlank()) { questionInput.error = getString(R.string.write_question); return }
+        if (question.isBlank()) {
+            questionInput.error = getString(R.string.write_question)
+            return
+        }
         val button = findViewById<Button>(R.id.aiAsk)
         button.isEnabled = false
         answerView.text = getString(R.string.ai_analyzing_library)
         lifecycleScope.launch {
             val result = AiLibraryAssistant.ask(filesDir, question)
             button.isEnabled = true
-            result.onSuccess { answerView.text = it }.onFailure {
-                answerView.text = getString(R.string.ai_failed)
-                Toast.makeText(this@AiAssistantActivity, it.message ?: getString(R.string.ai_error), Toast.LENGTH_LONG).show()
-            }
+            result.fold(
+                onSuccess = { answerView.text = it },
+                onFailure = {
+                    answerView.text = getString(R.string.ai_failed)
+                    Toast.makeText(
+                        this@AiAssistantActivity,
+                        it.message ?: getString(R.string.ai_error),
+                        Toast.LENGTH_LONG
+                    ).show()
+                }
+            )
         }
     }
 }
