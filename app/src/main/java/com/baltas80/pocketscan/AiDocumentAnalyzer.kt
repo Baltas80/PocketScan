@@ -21,6 +21,8 @@ import java.util.Locale
  * AI is unavailable, PocketScan falls back to deterministic local extraction.
  */
 object AiDocumentAnalyzer {
+    private const val MAX_INLINE_PDF_BYTES = 14_000_000L
+
     data class Analysis(
         val category: String,
         val title: String,
@@ -66,6 +68,9 @@ object AiDocumentAnalyzer {
     }
 
     private suspend fun tryCloudAnalysis(file: File, ocrText: String): Result<Analysis> = runCatching {
+        require(file.length() <= MAX_INLINE_PDF_BYTES) {
+            "PDF demasiado grande para el análisis IA directo (${file.length() / 1_000_000} MB)."
+        }
         val model: GenerativeModel = Firebase.ai(backend = GenerativeBackend.googleAI())
             .generativeModel(
                 modelName = "gemini-3.8-flash",
