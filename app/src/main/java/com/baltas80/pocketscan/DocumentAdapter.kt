@@ -5,6 +5,7 @@ import android.view.View
 import android.view.ViewGroup
 import android.widget.Button
 import android.widget.TextView
+import android.widget.Toast
 import androidx.recyclerview.widget.RecyclerView
 import java.io.File
 
@@ -35,10 +36,18 @@ class DocumentAdapter(
         fun bind(file: File) {
             name.text = file.nameWithoutExtension
             category.text = "Categoría: ${DocumentOrganizer.categoryForFile(file, scansDir)}"
-            aiStatus.text = if (AiMetadataStore.sidecarFor(file).isFile) {
+            val analyzed = AiMetadataStore.sidecarFor(file).isFile
+            aiStatus.text = if (analyzed) {
                 itemView.context.getString(R.string.ai_status_ready)
             } else {
                 itemView.context.getString(R.string.ai_status_pending)
+            }
+            aiStatus.isClickable = !analyzed
+            aiStatus.setOnClickListener {
+                if (!analyzed) {
+                    AiAnalysisScheduler.enqueue(itemView.context, file)
+                    Toast.makeText(itemView.context, R.string.ai_analysis_started, Toast.LENGTH_SHORT).show()
+                }
             }
             open.setOnClickListener { onOpen(file) }
             share.setOnClickListener { onShare(file) }
