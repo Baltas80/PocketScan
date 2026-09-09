@@ -21,27 +21,21 @@ class AiAssistantActivity : AppCompatActivity() {
         findViewById<Button>(R.id.aiAsk).setOnClickListener { ask() }
     }
 
-    override fun onResume() {
-        super.onResume()
-        AppLockManager.authenticateIfNeeded(this) { finish() }
-    }
+    override fun onResume() { super.onResume(); AppLockManager.authenticateIfNeeded(this) { finish() } }
 
     private fun ask() {
         val question = questionInput.text.toString().trim()
-        if (question.isBlank()) {
-            questionInput.error = "Escribe una pregunta"
-            return
-        }
-        findViewById<Button>(R.id.aiAsk).isEnabled = false
-        answerView.text = "Analizando tu biblioteca…"
+        if (question.isBlank()) { questionInput.error = getString(R.string.write_question); return }
+        val button = findViewById<Button>(R.id.aiAsk)
+        button.isEnabled = false
+        answerView.text = getString(R.string.ai_analyzing_library)
         lifecycleScope.launch {
             val result = AiLibraryAssistant.ask(filesDir, question)
-            findViewById<Button>(R.id.aiAsk).isEnabled = true
-            result.onSuccess { answerView.text = it }
-                .onFailure {
-                    answerView.text = "No se pudo completar la consulta."
-                    Toast.makeText(this@AiAssistantActivity, it.message ?: "Error de IA", Toast.LENGTH_LONG).show()
-                }
+            button.isEnabled = true
+            result.onSuccess { answerView.text = it }.onFailure {
+                answerView.text = getString(R.string.ai_failed)
+                Toast.makeText(this@AiAssistantActivity, it.message ?: getString(R.string.ai_error), Toast.LENGTH_LONG).show()
+            }
         }
     }
 }
