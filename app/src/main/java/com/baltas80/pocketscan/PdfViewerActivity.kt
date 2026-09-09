@@ -9,6 +9,7 @@ import android.view.LayoutInflater
 import android.view.View
 import android.view.ViewGroup
 import android.widget.Button
+import android.widget.EditText
 import android.widget.TextView
 import android.widget.Toast
 import androidx.appcompat.app.AlertDialog
@@ -41,6 +42,7 @@ class PdfViewerActivity : AppCompatActivity() {
         }
         findViewById<TextView>(R.id.viewerTitle).text = pdfFile.name
         findViewById<Button>(R.id.viewerAi).setOnClickListener { analyzeWithAi() }
+        findViewById<Button>(R.id.viewerAsk).setOnClickListener { askAboutDocument() }
         findViewById<Button>(R.id.viewerShare).setOnClickListener { shareDocument() }
         findViewById<Button>(R.id.viewerClose).setOnClickListener { finish() }
         pageList = findViewById(R.id.pdfPagesRecycler)
@@ -61,13 +63,15 @@ class PdfViewerActivity : AppCompatActivity() {
         if (::pdfFile.isInitialized) AppLockManager.authenticateIfNeeded(this) { finish() }
     }
 
+    private fun readOcr(): String {
+        val textFile = File(pdfFile.parentFile, pdfFile.nameWithoutExtension + ".txt")
+        return runCatching { if (textFile.isFile) textFile.readText(Charsets.UTF_8) else "" }.getOrDefault("")
+    }
+
     private fun analyzeWithAi() {
         findViewById<Button>(R.id.viewerAi).isEnabled = false
         lifecycleScope.launch {
-            val textFile = File(pdfFile.parentFile, pdfFile.nameWithoutExtension + ".txt")
-            val ocr = withContext(Dispatchers.IO) {
-                runCatching { if (textFile.isFile) textFile.readText(Charsets.UTF_8) else "" }.getOrDefault("")
-            }
+            val ocr = withContext(Dispatchers.IO) { readOcr() }
             val result = AiDocumentAnalyzer.analyze(pdfFile, ocr)
             findViewById<Button>(R.id.viewerAi).isEnabled = true
             result.onSuccess { analysis ->
@@ -85,13 +89,57 @@ class PdfViewerActivity : AppCompatActivity() {
                     .setPositiveButton(android.R.string.ok, null)
                     .show()
             }.onFailure { error ->
-                Toast.makeText(
-                    this@PdfViewerActivity,
-                    error.message ?: "No se pudo analizar el documento",
-                    Toast.LENGTH_LONG
-                ).show()
+                Toast.makeText(this@PdfViewerActivity, error.message ?: "No se pudo analizar el documento", Toast.LENGTH_LONG).show()
             }
         }
+    }
+
+    private fun askAboutDocument() {
+        val input = EditText(this).apply {
+            hint = "Ej.: ¿Cuál es el importe total?"
+            setSingleLine(false)
+            minLines = 2
+            maxLines = 4
+        }
+        val answer = TextView(this).apply {
+            text = "La respuesta aparecerá aquí."
+            textIsSelectable = true
+            setPadding(0, 16, 0, 0)
+        }
+        val container = android.widget.LinearLayout(this).apply {
+            orientation = android.widget.LinearLayout.VERTICAL
+            setPadding(24, 8, 24, 8)
+            addView(input, android.widget.LinearLayout.LayoutParams(-1, -2))
+            addView(answer, android.widget.LinearLayout.LayoutParams(-1, -2))
+        }
+        val dialog = AlertDialog.Builder(this)
+            .setTitle("Preguntar sobre este documento")
+            .setView(container)
+            .setNegativeButton(android.R.string.cancel, null)
+            .setPositiveButton("Preguntar", null)
+            .create()
+        dialog.setOnShowListener {
+            dialog.getButton(AlertDialog.BUTTON_POSITIVE).setOnClickListener {
+                val question = input.text.toString().trim()
+                if (question.isBlank()) {
+                    input.error = "Escribe una pregunta"
+                    return@setOnClickListener
+                }
+                val button = dialog.getButton(AlertDialog.BUTTON_POSITIVE)
+                button.isEnabled = false
+                answer.text = "Analizando el documento…\n"
+                lifecycleScope.launch {
+                    runCatching {
+                        AiPdfAssistant.answerStream(pdfFile, withContext(Dispatchers.IO) { readOcr() }, question)
+                            .collect { chunk -> answer.append(chunk) }
+                    }.onFailure {
+                        answer.append("\n\nNo se pudo completar la consulta: ${it.message ?: "error de IA"}")
+                    }
+                    button.isEnabled = true
+                }
+            }
+        }
+        dialog.show()
     }
 
     private fun countPages(): Int = runCatching {
