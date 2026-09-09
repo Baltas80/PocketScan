@@ -22,12 +22,14 @@ class DocumentAdapter(
 
     inner class DocumentViewHolder(view: View) : RecyclerView.ViewHolder(view) {
         private val name: TextView = view.findViewById(R.id.documentName)
+        private val category: TextView = view.findViewById(R.id.documentCategory)
         private val open: Button = view.findViewById(R.id.openButton)
         private val share: Button = view.findViewById(R.id.shareButton)
         private val rename: Button = view.findViewById(R.id.renameButton)
         private val delete: Button = view.findViewById(R.id.deleteButton)
         fun bind(file: File) {
             name.text = file.nameWithoutExtension
+            category.text = "Categoría: ${DocumentOrganizer.categoryForFile(file, File(file.path.substringBeforeLast("/scans") + "/scans"))}"
             open.setOnClickListener { onOpen(file) }
             share.setOnClickListener { onShare(file) }
             rename.setOnClickListener { onRename(file) }
