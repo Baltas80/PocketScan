@@ -12,13 +12,9 @@ class MainActivity : AppCompatActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         setContentView(R.layout.activity_main)
-
-        findViewById<Button>(R.id.scanButton).setOnClickListener {
-            startActivity(Intent(this, SmartScannerActivity::class.java))
-        }
-        findViewById<Button>(R.id.documentsButton).setOnClickListener {
-            startActivity(Intent(this, DocumentsActivity::class.java))
-        }
+        findViewById<Button>(R.id.scanButton).setOnClickListener { startActivity(Intent(this, SmartScannerActivity::class.java)) }
+        findViewById<Button>(R.id.documentsButton).setOnClickListener { startActivity(Intent(this, DocumentsActivity::class.java)) }
+        findViewById<Button>(R.id.aiAssistantButton).setOnClickListener { startActivity(Intent(this, AiAssistantActivity::class.java)) }
         lockButton = findViewById(R.id.lockButton)
         lockButton.setOnClickListener {
             AppLockManager.toggle(this) { success ->
