@@ -10,6 +10,7 @@ import java.io.File
 
 class DocumentAdapter(
     private val items: List<File>,
+    private val scansDir: File,
     private val onOpen: (File) -> Unit,
     private val onShare: (File) -> Unit,
     private val onRename: (File) -> Unit,
@@ -29,7 +30,7 @@ class DocumentAdapter(
         private val delete: Button = view.findViewById(R.id.deleteButton)
         fun bind(file: File) {
             name.text = file.nameWithoutExtension
-            category.text = "Categoría: ${DocumentOrganizer.categoryForFile(file, File(file.path.substringBeforeLast("/scans") + "/scans"))}"
+            category.text = "Categoría: ${DocumentOrganizer.categoryForFile(file, scansDir)}"
             open.setOnClickListener { onOpen(file) }
             share.setOnClickListener { onShare(file) }
             rename.setOnClickListener { onRename(file) }
