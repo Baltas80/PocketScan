@@ -71,14 +71,16 @@ object AiDocumentAnalyzer {
         require(file.length() <= MAX_INLINE_PDF_BYTES) {
             "PDF demasiado grande para el análisis IA directo (${file.length() / 1_000_000} MB)."
         }
-        val model: GenerativeModel = Firebase.ai(backend = GenerativeBackend.googleAI())
-            .generativeModel(
-                modelName = AiModelConfig.modelName(),
-                generationConfig = generationConfig {
-                    responseMimeType = "application/json"
-                    responseSchema = documentSchema
-                }
-            )
+        val model: GenerativeModel = Firebase.ai(
+            backend = GenerativeBackend.googleAI(),
+            useLimitedUseAppCheckTokens = true
+        ).generativeModel(
+            modelName = AiModelConfig.modelName(),
+            generationConfig = generationConfig {
+                responseMimeType = "application/json"
+                responseSchema = documentSchema
+            }
+        )
 
         val auxiliaryOcr = ocrText.take(12000)
         val prompt = content {
@@ -123,31 +125,15 @@ object AiDocumentAnalyzer {
             DocumentOrganizer.CONTRATOS -> "Contrato"
             DocumentOrganizer.RECIBOS -> "Recibo"
             DocumentOrganizer.TICKETS -> "Ticket"
-            DocumentOrganizer.NOMINAS -> "Nomina"
+            DocumentOrganizer.NOMINAS -> "Nómina"
             DocumentOrganizer.CERTIFICADOS -> "Certificado"
             DocumentOrganizer.INFORMES -> "Informe"
             DocumentOrganizer.CITAS -> "Cita"
             else -> "Documento"
         }
-        val usefulLine = text.lines().map { it.trim() }
-            .firstOrNull { it.length >= 4 && !it.equals(type, true) && !it.matches(Regex("[0-9 ./,:-]+")) }
-        val title = sanitizeTitle(usefulLine ?: file.nameWithoutExtension).take(70).ifBlank { type }
-        val fields = linkedMapOf<String, String>()
-        firstMatch(text, Regex("(?i)\\b(?:total|importe total|total amount|montant total|gesamtbetrag|totale)\\s*[:€]?\\s*([0-9.,]+)"))?.let { fields["total"] = it }
-        firstMatch(text, Regex("(?i)\\b(?:iva|vat|tva|mwst)\\s*[:%]?\\s*([0-9.,]+\\s*%?)"))?.let { fields["iva"] = it }
-        firstMatch(text, Regex("(?i)\\b(?:fecha|date|datum|data)\\s*[:.-]?\\s*(\\d{1,2}[/-]\\d{1,2}[/-]\\d{2,4})"))?.let { fields["fecha"] = it }
-        firstMatch(text, Regex("(?i)\\b(?:nif|cif|vat|tax id)\\s*[:.-]?\\s*([A-Z]?[0-9]{7,9}[A-Z]?)"))?.let { fields["nif_cif"] = it }
-        return Analysis(
-            category,
-            title,
-            if (text.isBlank()) "No OCR available for a more precise local analysis." else "Local classification based on OCR text.",
-            fields,
-            "local"
-        )
+        val title = text.lineSequence().map { it.trim() }.firstOrNull { it.length in 4..100 } ?: file.nameWithoutExtension
+        return Analysis(category, title, text.replace(Regex("\\s+"), " ").trim().take(500), emptyMap())
     }
-
-    private fun firstMatch(text: String, regex: Regex): String? =
-        regex.find(text)?.groupValues?.getOrNull(1)?.trim()?.takeIf { it.isNotEmpty() }
 
     private fun normalizeCategory(value: String): String = when (value.trim().uppercase(Locale.ROOT)) {
         "FACTURAS" -> DocumentOrganizer.FACTURAS
@@ -162,27 +148,14 @@ object AiDocumentAnalyzer {
         else -> DocumentOrganizer.GENERAL
     }
 
-    private fun sanitizeTitle(value: String): String = value
-        .replace(Regex("\\s+"), " ")
-        .replace(Regex("[\\r\\n]+"), " ")
-        .trim()
-
     private fun languageName(): String = when (Locale.getDefault().language.lowercase(Locale.ROOT)) {
-        "es" -> "Spanish"
+        "es" -> "Spanish (Spain)"
         "en" -> "English"
         "fr" -> "French"
         "de" -> "German"
         "it" -> "Italian"
         "pt" -> "Portuguese"
         "ca" -> "Catalan"
-        "ar" -> "Arabic"
-        "nl" -> "Dutch"
-        "pl" -> "Polish"
-        "tr" -> "Turkish"
-        "ja" -> "Japanese"
-        "ko" -> "Korean"
-        "zh" -> "Chinese"
-        "ru" -> "Russian"
-        else -> "English"
+        else -> Locale.getDefault().displayLanguage
     }
 }
