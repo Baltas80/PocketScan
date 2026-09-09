@@ -54,13 +54,18 @@ object DocumentOrganizer {
             counter++
         }
         if (!pdf.renameTo(target)) return pdf
-        text?.takeIf { it.exists() }?.let { sidecar ->
-            val sidecarTarget = File(targetDir, target.nameWithoutExtension + ".txt")
-            if (!sidecar.renameTo(sidecarTarget)) {
-                sidecar.copyTo(sidecarTarget, overwrite = true)
+        moveSidecar(text, targetDir, target.nameWithoutExtension + ".txt")
+        moveSidecar(File(pdf.parentFile, pdf.nameWithoutExtension + ".ai.json"), targetDir, target.nameWithoutExtension + ".ai.json")
+        return target
+    }
+
+    private fun moveSidecar(source: File?, targetDir: File, targetName: String) {
+        source?.takeIf { it.exists() }?.let { sidecar ->
+            val target = File(targetDir, targetName)
+            if (!sidecar.renameTo(target)) {
+                sidecar.copyTo(target, overwrite = true)
                 sidecar.delete()
             }
         }
-        return target
     }
 }
