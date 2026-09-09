@@ -56,7 +56,7 @@ object AiLibraryQueryEngine {
             .map { file -> file to AiMetadataStore.load(file) }
             .filter { (file, analysis) ->
                 val corpus = normalize(buildCorpus(file, analysis))
-                val categoryOk = category == null || analysis?.category == category
+                val categoryOk = category == null || analysis?.category?.let { categoryKey(it) } == category
                 val yearOk = year == null || extractYear(analysis?.fields?.get("fecha")) == year
                 val amount = extractAmount(analysis?.fields?.get("total"))
                 val amountOk = amountFilter == null || amountFilter.matches(amount)
@@ -160,6 +160,19 @@ object AiLibraryQueryEngine {
         }
         val ocr = File(file.parentFile, "${file.nameWithoutExtension}.txt")
         if (ocr.isFile) append(ocr.readText(Charsets.UTF_8).take(12000))
+    }
+
+    private fun categoryKey(category: String): String = when (normalize(category)) {
+        "facturas" -> "FACTURAS"
+        "presupuestos" -> "PRESUPUESTOS"
+        "contratos" -> "CONTRATOS"
+        "recibos" -> "RECIBOS"
+        "tickets" -> "TICKETS"
+        "nominas" -> "NOMINAS"
+        "certificados" -> "CERTIFICADOS"
+        "informes" -> "INFORMES"
+        "citas" -> "CITAS"
+        else -> "GENERAL"
     }
 
     private fun extractAmount(value: String?): Pair<Double, String>? {
