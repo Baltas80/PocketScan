@@ -3,7 +3,9 @@ package com.baltas80.pocketscan
 import android.content.Intent
 import android.net.Uri
 import android.os.Bundle
-import android.provider.OpenableColumns
+import android.text.Editable
+import android.text.TextWatcher
+import android.widget.Button
 import android.widget.EditText
 import android.widget.Toast
 import androidx.activity.result.contract.ActivityResultContracts
@@ -22,11 +24,8 @@ class DocumentsActivity : AppCompatActivity() {
     private val allDocuments = mutableListOf<File>()
     private lateinit var adapter: DocumentAdapter
 
-    private val importImagesLauncher = registerForActivityResult(
-        ActivityResultContracts.GetMultipleContents()
-    ) { uris ->
-        if (uris.isNullOrEmpty()) return@registerForActivityResult
-        importImagesAsPdf(uris)
+    private val importImagesLauncher = registerForActivityResult(ActivityResultContracts.GetMultipleContents()) { uris ->
+        if (!uris.isNullOrEmpty()) importImagesAsPdf(uris)
     }
 
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -37,16 +36,15 @@ class DocumentsActivity : AppCompatActivity() {
         adapter = DocumentAdapter(documents, ::openDocument, ::shareDocument, ::renameDocument, ::deleteDocument)
         recyclerView.layoutManager = LinearLayoutManager(this)
         recyclerView.adapter = adapter
+        findViewById<Button>(R.id.importButton).setOnClickListener { importImagesLauncher.launch("image/*") }
+        searchInput.addTextChangedListener(object : TextWatcher {
+            override fun beforeTextChanged(s: CharSequence?, start: Int, count: Int, after: Int) = Unit
+            override fun onTextChanged(s: CharSequence?, start: Int, before: Int, count: Int) = filterDocuments(s?.toString().orEmpty())
+            override fun afterTextChanged(s: Editable?) = Unit
+        })
     }
 
-    override fun onResume() {
-        super.onResume()
-        loadDocuments()
-    }
-
-    fun importFromGallery() {
-        importImagesLauncher.launch("image/*")
-    }
+    override fun onResume() { super.onResume(); loadDocuments() }
 
     private fun loadDocuments() {
         val dir = File(filesDir, "scans")
@@ -97,9 +95,8 @@ class DocumentsActivity : AppCompatActivity() {
         try {
             uris.forEachIndexed { index, uri ->
                 val temp = File(dir, "import_${stamp}_$index.jpg")
-                contentResolver.openInputStream(uri)?.use { input ->
-                    FileOutputStream(temp).use { output -> input.copyTo(output) }
-                } ?: error("No se pudo leer una imagen")
+                contentResolver.openInputStream(uri)?.use { input -> FileOutputStream(temp).use { output -> input.copyTo(output) } }
+                    ?: error("No se pudo leer una imagen")
                 tempFiles.add(temp)
             }
             createPdfFromImages(tempFiles, pdf)
@@ -109,8 +106,7 @@ class DocumentsActivity : AppCompatActivity() {
                 Toast.makeText(this, "Documento importado", Toast.LENGTH_SHORT).show()
             }
         } catch (e: Exception) {
-            tempFiles.forEach { it.delete() }
-            pdf.delete(); text.delete()
+            tempFiles.forEach { it.delete() }; pdf.delete(); text.delete()
             Toast.makeText(this, e.message ?: "No se pudo importar", Toast.LENGTH_LONG).show()
         }
     }
@@ -119,45 +115,31 @@ class DocumentsActivity : AppCompatActivity() {
         val document = android.graphics.pdf.PdfDocument()
         try {
             files.forEachIndexed { index, file ->
-                val bitmap = android.graphics.BitmapFactory.decodeFile(file.absolutePath)
-                    ?: error("Imagen no válida")
+                val bitmap = android.graphics.BitmapFactory.decodeFile(file.absolutePath) ?: error("Imagen no válida")
                 val page = document.startPage(android.graphics.pdf.PdfDocument.PageInfo.Builder(595, 842, index + 1).create())
                 val margin = 24f
                 val scale = minOf((595f - margin * 2) / bitmap.width, (842f - margin * 2) / bitmap.height)
-                val width = bitmap.width * scale
-                val height = bitmap.height * scale
-                val left = (595f - width) / 2f
-                val top = (842f - height) / 2f
+                val width = bitmap.width * scale; val height = bitmap.height * scale
+                val left = (595f - width) / 2f; val top = (842f - height) / 2f
                 page.canvas.drawBitmap(bitmap, null, android.graphics.RectF(left, top, left + width, top + height), null)
-                document.finishPage(page)
-                bitmap.recycle()
+                document.finishPage(page); bitmap.recycle()
             }
             FileOutputStream(pdfFile).use { document.writeTo(it) }
         } finally { document.close() }
     }
 
     private fun runOcr(files: List<File>, textFile: File, onComplete: () -> Unit) {
-        val recognizer = com.google.mlkit.vision.text.TextRecognition.getClient(
-            com.google.mlkit.vision.text.latin.TextRecognizerOptions.DEFAULT_OPTIONS
-        )
+        val recognizer = com.google.mlkit.vision.text.TextRecognition.getClient(com.google.mlkit.vision.text.latin.TextRecognizerOptions.DEFAULT_OPTIONS)
         val all = StringBuilder()
-        fun complete() {
-            try { textFile.writeText(all.toString(), Charsets.UTF_8) }
-            finally { recognizer.close(); onComplete() }
-        }
+        fun complete() { try { textFile.writeText(all.toString(), Charsets.UTF_8) } finally { recognizer.close(); onComplete() } }
         fun next(index: Int) {
             if (index >= files.size) { complete(); return }
             try {
                 val image = com.google.mlkit.vision.common.InputImage.fromFilePath(this, Uri.fromFile(files[index]))
-                recognizer.process(image)
-                    .addOnSuccessListener { result ->
-                        if (result.text.isNotBlank()) {
-                            if (all.isNotEmpty()) all.append("\n\n")
-                            all.append(result.text)
-                        }
-                        next(index + 1)
-                    }
-                    .addOnFailureListener { next(index + 1) }
+                recognizer.process(image).addOnSuccessListener { result ->
+                    if (result.text.isNotBlank()) { if (all.isNotEmpty()) all.append("\n\n"); all.append(result.text) }
+                    next(index + 1)
+                }.addOnFailureListener { next(index + 1) }
             } catch (_: Exception) { next(index + 1) }
         }
         next(0)
