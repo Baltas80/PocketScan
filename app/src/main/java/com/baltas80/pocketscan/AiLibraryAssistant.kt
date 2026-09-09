@@ -61,7 +61,7 @@ object AiLibraryAssistant {
             "fr" -> "L’IA cloud n’est pas disponible. Résultats locaux :"
             "de" -> "Cloud-KI ist nicht verfügbar. Lokale Ergebnisse:"
             "it" -> "L’IA cloud non è disponibile. Risultati locali:"
-            "pt" -> "A IA na nuvem não está disponible. Resultados locais:"
+            "pt" -> "A IA na nuvem não está disponível. Resultados locais:"
             "ca" -> "La IA al núvol no està disponible. Resultats locals:"
             else -> "Cloud AI is unavailable. Local results:"
         }
