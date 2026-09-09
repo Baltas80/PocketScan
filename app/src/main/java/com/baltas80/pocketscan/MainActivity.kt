@@ -3,9 +3,12 @@ package com.baltas80.pocketscan
 import android.content.Intent
 import android.os.Bundle
 import android.widget.Button
+import android.widget.Toast
 import androidx.appcompat.app.AppCompatActivity
 
 class MainActivity : AppCompatActivity() {
+    private lateinit var lockButton: Button
+
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         setContentView(R.layout.activity_main)
@@ -16,5 +19,23 @@ class MainActivity : AppCompatActivity() {
         findViewById<Button>(R.id.documentsButton).setOnClickListener {
             startActivity(Intent(this, DocumentsActivity::class.java))
         }
+        lockButton = findViewById(R.id.lockButton)
+        lockButton.setOnClickListener {
+            AppLockManager.toggle(this) { success ->
+                if (success) updateLockButton()
+                else Toast.makeText(this, "No se ha cambiado el bloqueo", Toast.LENGTH_SHORT).show()
+            }
+        }
+        updateLockButton()
+    }
+
+    override fun onResume() {
+        super.onResume()
+        if (::lockButton.isInitialized) updateLockButton()
+        AppLockManager.authenticateIfNeeded(this) { finishAffinity() }
+    }
+
+    private fun updateLockButton() {
+        lockButton.text = if (AppLockManager.isEnabled(this)) "Desactivar bloqueo biométrico" else "Activar bloqueo biométrico"
     }
 }
