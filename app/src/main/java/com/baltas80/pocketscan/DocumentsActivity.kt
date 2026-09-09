@@ -5,8 +5,10 @@ import android.net.Uri
 import android.os.Bundle
 import android.text.Editable
 import android.text.TextWatcher
+import android.widget.ArrayAdapter
 import android.widget.Button
 import android.widget.EditText
+import android.widget.Spinner
 import android.widget.Toast
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.appcompat.app.AlertDialog
@@ -21,9 +23,11 @@ import java.text.Normalizer
 class DocumentsActivity : AppCompatActivity() {
     private lateinit var recyclerView: RecyclerView
     private lateinit var searchInput: EditText
+    private lateinit var categorySpinner: Spinner
     private val documents = mutableListOf<File>()
     private val allDocuments = mutableListOf<File>()
     private lateinit var adapter: DocumentAdapter
+    private val scansDir get() = File(filesDir, "scans")
 
     private val importImagesLauncher = registerForActivityResult(ActivityResultContracts.GetMultipleContents()) { uris ->
         if (!uris.isNullOrEmpty()) importImagesAsPdf(uris)
@@ -34,13 +38,21 @@ class DocumentsActivity : AppCompatActivity() {
         setContentView(R.layout.activity_documents)
         recyclerView = findViewById(R.id.documentsRecycler)
         searchInput = findViewById(R.id.searchInput)
+        categorySpinner = findViewById(R.id.categorySpinner)
         adapter = DocumentAdapter(documents, ::openDocument, ::shareDocument, ::renameDocument, ::deleteDocument)
         recyclerView.layoutManager = LinearLayoutManager(this)
         recyclerView.adapter = adapter
+
+        val categories = listOf("Todas") + DocumentOrganizer.categories
+        categorySpinner.adapter = ArrayAdapter(this, android.R.layout.simple_spinner_dropdown_item, categories)
+        categorySpinner.onItemSelectedListener = object : android.widget.AdapterView.OnItemSelectedListener {
+            override fun onNothingSelected(parent: android.widget.AdapterView<*>?) = Unit
+            override fun onItemSelected(parent: android.widget.AdapterView<*>?, view: android.view.View?, position: Int, id: Long) = applyFilters()
+        }
         findViewById<Button>(R.id.importButton).setOnClickListener { importImagesLauncher.launch("image/*") }
         searchInput.addTextChangedListener(object : TextWatcher {
             override fun beforeTextChanged(s: CharSequence?, start: Int, count: Int, after: Int) = Unit
-            override fun onTextChanged(s: CharSequence?, start: Int, before: Int, count: Int) = filterDocuments(s?.toString().orEmpty())
+            override fun onTextChanged(s: CharSequence?, start: Int, before: Int, count: Int) = applyFilters()
             override fun afterTextChanged(s: Editable?) = Unit
         })
     }
@@ -52,21 +64,26 @@ class DocumentsActivity : AppCompatActivity() {
     }
 
     private fun loadDocuments() {
-        val dir = File(filesDir, "scans")
+        scansDir.mkdirs()
         allDocuments.clear()
-        allDocuments.addAll(dir.listFiles()?.filter { it.extension.equals("pdf", true) }
-            ?.sortedByDescending { it.lastModified() } ?: emptyList())
-        filterDocuments(searchInput.text?.toString().orEmpty())
+        allDocuments.addAll(scansDir.walkTopDown()
+            .filter { it.isFile && it.extension.equals("pdf", true) }
+            .sortedByDescending { it.lastModified() })
+        applyFilters()
     }
 
-    private fun filterDocuments(query: String) {
-        val normalized = query.trim().lowercase()
+    private fun applyFilters() {
+        val query = searchInput.text?.toString().orEmpty().trim().lowercase()
+        val selected = categorySpinner.selectedItem?.toString() ?: "Todas"
         documents.clear()
-        if (normalized.isEmpty()) documents.addAll(allDocuments)
-        else documents.addAll(allDocuments.filter { file ->
-            file.nameWithoutExtension.lowercase().contains(normalized) ||
+        documents.addAll(allDocuments.filter { file ->
+            val category = DocumentOrganizer.categoryForFile(file, scansDir)
+            val categoryOk = selected == "Todas" || category == selected
+            if (!categoryOk) return@filter false
+            if (query.isEmpty()) return@filter true
+            file.nameWithoutExtension.lowercase().contains(query) ||
                 File(file.parentFile, file.nameWithoutExtension + ".txt").takeIf { it.exists() }
-                    ?.readText(Charsets.UTF_8)?.lowercase()?.contains(normalized) == true
+                    ?.readText(Charsets.UTF_8)?.lowercase()?.contains(query) == true
         })
         adapter.notifyDataSetChanged()
     }
@@ -84,24 +101,29 @@ class DocumentsActivity : AppCompatActivity() {
     }
 
     private fun importImagesAsPdf(uris: List<Uri>) {
-        val dir = File(filesDir, "scans").apply { mkdirs() }
+        scansDir.mkdirs()
         val stamp = System.currentTimeMillis()
-        val pdf = File(dir, "document_import_$stamp.pdf")
-        val text = File(dir, "document_import_$stamp.txt")
+        val pdf = File(scansDir, "document_import_$stamp.pdf")
+        val text = File(scansDir, "document_import_$stamp.txt")
         val tempFiles = mutableListOf<File>()
         try {
             uris.forEachIndexed { index, uri ->
-                val temp = File(dir, "import_${stamp}_$index.jpg")
-                contentResolver.openInputStream(uri)?.use { input -> FileOutputStream(temp).use { output -> input.copyTo(output) } } ?: error("No se pudo leer una imagen")
+                val temp = File(scansDir, "import_${stamp}_$index.jpg")
+                contentResolver.openInputStream(uri)?.use { input -> FileOutputStream(temp).use { output -> input.copyTo(output) } }
+                    ?: error("No se pudo leer una imagen")
                 tempFiles.add(temp)
             }
             createPdfFromImages(tempFiles, pdf)
             runOcr(tempFiles, text) {
                 tempFiles.forEach { it.delete() }
                 val renamedPdf = autoNameDocument(pdf, text.readText(Charsets.UTF_8), "Documento importado")
-                if (renamedPdf != pdf) text.renameTo(File(dir, renamedPdf.nameWithoutExtension + ".txt"))
+                val finalPdf = renamedPdf
+                val finalText = File(finalPdf.parentFile, finalPdf.nameWithoutExtension + ".txt")
+                if (text.exists() && text.absolutePath != finalText.absolutePath) text.renameTo(finalText)
+                val category = DocumentOrganizer.categoryForText(finalText.takeIf { it.exists() }?.readText(Charsets.UTF_8).orEmpty())
+                DocumentOrganizer.moveDocument(finalPdf, finalText, scansDir, category)
                 loadDocuments()
-                Toast.makeText(this, "Documento importado", Toast.LENGTH_SHORT).show()
+                Toast.makeText(this, "Documento importado en $category", Toast.LENGTH_SHORT).show()
             }
         } catch (e: Exception) {
             tempFiles.forEach { it.delete() }; pdf.delete(); text.delete()
@@ -155,12 +177,22 @@ class DocumentsActivity : AppCompatActivity() {
 
     private fun suggestDocumentName(text: String, fallback: String): String {
         val lines = text.lines().map { it.trim() }.filter { it.length >= 4 }
-        val keywords = listOf("factura" to "Factura", "invoice" to "Factura", "presupuesto" to "Presupuesto", "contrato" to "Contrato", "recibo" to "Recibo", "ticket" to "Ticket", "nómina" to "Nomina", "nomina" to "Nomina", "certificado" to "Certificado", "informe" to "Informe", "cita" to "Cita")
         val lower = text.lowercase()
-        val type = keywords.firstOrNull { lower.contains(it.first) }?.second ?: fallback
-        val usefulLine = lines.firstOrNull { line -> keywords.none { line.lowercase() == it.first } && !line.lowercase().matches(Regex("[0-9 ./:-]+")) } ?: type
-        val cleanLine = sanitizeFileName(usefulLine).take(45).trim().trim('.', '_', '-')
-        val base = if (cleanLine.length >= 4) "$type - $cleanLine" else type
+        val type = when (DocumentOrganizer.categoryForText(text)) {
+            DocumentOrganizer.FACTURAS -> "Factura"
+            DocumentOrganizer.PRESUPUESTOS -> "Presupuesto"
+            DocumentOrganizer.CONTRATOS -> "Contrato"
+            DocumentOrganizer.RECIBOS -> "Recibo"
+            DocumentOrganizer.TICKETS -> "Ticket"
+            DocumentOrganizer.NOMINAS -> "Nomina"
+            DocumentOrganizer.CERTIFICADOS -> "Certificado"
+            DocumentOrganizer.INFORMES -> "Informe"
+            DocumentOrganizer.CITAS -> "Cita"
+            else -> fallback
+        }
+        val usefulLine = lines.firstOrNull { line -> !line.lowercase().contains(type.lowercase()) && !line.lowercase().matches(Regex("[0-9 ./:-]+")) }
+        val cleanLine = sanitizeFileName(usefulLine ?: type).take(45).trim().trim('.', '_', '-')
+        val base = if (cleanLine.length >= 4 && !lower.trim().equals(cleanLine.lowercase())) "$type - $cleanLine" else type
         return sanitizeFileName(base).take(80).trim().ifEmpty { "Documento" }
     }
 
@@ -173,12 +205,13 @@ class DocumentsActivity : AppCompatActivity() {
         val input = EditText(this).apply { setText(file.nameWithoutExtension); selectAll() }
         AlertDialog.Builder(this).setTitle(R.string.rename_document).setView(input).setNegativeButton(android.R.string.cancel, null)
             .setPositiveButton(R.string.rename) { _, _ ->
-                val newName = input.text.toString().trim()
+                val newName = sanitizeFileName(input.text.toString().trim())
                 if (newName.isEmpty()) return@setPositiveButton
                 val target = File(file.parentFile, "$newName.pdf")
                 if (target.exists()) { Toast.makeText(this, R.string.file_already_exists, Toast.LENGTH_SHORT).show(); return@setPositiveButton }
-                if (file.renameTo(target)) { File(file.parentFile, file.nameWithoutExtension + ".txt").renameTo(File(file.parentFile, "$newName.txt")); loadDocuments() }
-                else Toast.makeText(this, R.string.rename_failed, Toast.LENGTH_SHORT).show()
+                if (file.renameTo(target)) {
+                    File(file.parentFile, file.nameWithoutExtension + ".txt").renameTo(File(file.parentFile, "$newName.txt")); loadDocuments()
+                } else Toast.makeText(this, R.string.rename_failed, Toast.LENGTH_SHORT).show()
             }.show()
     }
 
