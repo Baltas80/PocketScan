@@ -73,7 +73,7 @@ object AiDocumentAnalyzer {
         }
         val model: GenerativeModel = Firebase.ai(backend = GenerativeBackend.googleAI())
             .generativeModel(
-                modelName = "gemini-3.8-flash",
+                modelName = AiModelConfig.modelName(),
                 generationConfig = generationConfig {
                     responseMimeType = "application/json"
                     responseSchema = documentSchema
