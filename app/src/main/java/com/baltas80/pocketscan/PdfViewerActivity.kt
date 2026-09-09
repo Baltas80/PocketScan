@@ -11,6 +11,7 @@ import android.view.ViewGroup
 import android.widget.Button
 import android.widget.TextView
 import android.widget.Toast
+import androidx.appcompat.app.AlertDialog
 import androidx.appcompat.app.AppCompatActivity
 import androidx.core.content.FileProvider
 import androidx.lifecycle.lifecycleScope
@@ -39,6 +40,7 @@ class PdfViewerActivity : AppCompatActivity() {
             return
         }
         findViewById<TextView>(R.id.viewerTitle).text = pdfFile.name
+        findViewById<Button>(R.id.viewerAi).setOnClickListener { analyzeWithAi() }
         findViewById<Button>(R.id.viewerShare).setOnClickListener { shareDocument() }
         findViewById<Button>(R.id.viewerClose).setOnClickListener { finish() }
         pageList = findViewById(R.id.pdfPagesRecycler)
@@ -57,6 +59,38 @@ class PdfViewerActivity : AppCompatActivity() {
     override fun onResume() {
         super.onResume()
         if (::pdfFile.isInitialized) AppLockManager.authenticateIfNeeded(this) { finish() }
+    }
+
+    private fun analyzeWithAi() {
+        findViewById<Button>(R.id.viewerAi).isEnabled = false
+        lifecycleScope.launch {
+            val textFile = File(pdfFile.parentFile, pdfFile.nameWithoutExtension + ".txt")
+            val ocr = withContext(Dispatchers.IO) {
+                runCatching { if (textFile.isFile) textFile.readText(Charsets.UTF_8) else "" }.getOrDefault("")
+            }
+            val result = AiDocumentAnalyzer.analyze(pdfFile, ocr)
+            findViewById<Button>(R.id.viewerAi).isEnabled = true
+            result.onSuccess { analysis ->
+                val fields = analysis.fields.entries.joinToString("\n") { "${it.key}: ${it.value}" }
+                val message = buildString {
+                    append("Categoría: ${analysis.category}\n")
+                    append("Título: ${analysis.title}\n\n")
+                    if (analysis.summary.isNotBlank()) append("Resumen:\n${analysis.summary}\n\n")
+                    if (fields.isNotBlank()) append("Datos extraídos:\n$fields")
+                }
+                AlertDialog.Builder(this@PdfViewerActivity)
+                    .setTitle("Análisis inteligente")
+                    .setMessage(message)
+                    .setPositiveButton(android.R.string.ok, null)
+                    .show()
+            }.onFailure { error ->
+                Toast.makeText(
+                    this@PdfViewerActivity,
+                    error.message ?: "No se pudo analizar el documento",
+                    Toast.LENGTH_LONG
+                ).show()
+            }
+        }
     }
 
     private fun countPages(): Int = runCatching {
