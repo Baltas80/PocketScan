@@ -27,6 +27,12 @@
             android:text="IA" />
 
         <Button
+            android:id="@+id/viewerAsk"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="Preguntar" />
+
+        <Button
             android:id="@+id/viewerShare"
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
