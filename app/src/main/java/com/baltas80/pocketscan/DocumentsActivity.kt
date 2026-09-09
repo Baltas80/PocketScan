@@ -96,7 +96,7 @@ class DocumentsActivity : AppCompatActivity() {
                 if (!pdfCreated) { tempFiles.forEach { it.delete() }; pdf.delete(); text.delete(); Toast.makeText(this@DocumentsActivity, R.string.pdf_failed, Toast.LENGTH_LONG).show(); return@createPdfFromImagesAsync }
                 runOcr(tempFiles, text) {
                     lifecycleScope.launch {
-                        val category = withContext(Dispatchers.IO) {
+                        val saved = withContext(Dispatchers.IO) {
                             tempFiles.forEach { it.delete() }
                             val ocr = runCatching { text.readText(Charsets.UTF_8) }.getOrDefault("")
                             val renamedPdf = autoNameDocument(pdf, ocr, getString(R.string.my_documents))
@@ -104,9 +104,11 @@ class DocumentsActivity : AppCompatActivity() {
                             if (text.exists() && text.absolutePath != finalText.absolutePath) text.renameTo(finalText)
                             val finalOcr = runCatching { finalText.takeIf { it.exists() }?.readText(Charsets.UTF_8).orEmpty() }.getOrDefault(ocr)
                             val detected = DocumentOrganizer.categoryForText(finalOcr)
-                            DocumentOrganizer.moveDocument(renamedPdf, finalText, scansDir, detected); detected
+                            val finalPdf = DocumentOrganizer.moveDocument(renamedPdf, finalText, scansDir, detected)
+                            Pair(detected, finalPdf)
                         }
-                        loadDocuments(); Toast.makeText(this@DocumentsActivity, getString(R.string.document_imported, category), Toast.LENGTH_SHORT).show()
+                        AiAnalysisScheduler.enqueue(this@DocumentsActivity, saved.second)
+                        loadDocuments(); Toast.makeText(this@DocumentsActivity, getString(R.string.document_imported, saved.first), Toast.LENGTH_SHORT).show()
                     }
                 }
             }
