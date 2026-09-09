@@ -16,6 +16,7 @@
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
         android:layout_marginTop="6dp">
+        <Button android:id="@+id/openButton" android:layout_width="0dp" android:layout_height="wrap_content" android:layout_weight="1" android:text="Abrir" />
         <Button android:id="@+id/shareButton" android:layout_width="0dp" android:layout_height="wrap_content" android:layout_weight="1" android:text="Compartir" />
         <Button android:id="@+id/renameButton" android:layout_width="0dp" android:layout_height="wrap_content" android:layout_weight="1" android:text="Renombrar" />
         <Button android:id="@+id/deleteButton" android:layout_width="0dp" android:layout_height="wrap_content" android:layout_weight="1" android:text="Borrar" />
