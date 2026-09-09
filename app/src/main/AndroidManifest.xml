@@ -13,6 +13,7 @@
             android:name="com.google.mlkit.vision.DEPENDENCIES"
             android:value="ocr" />
 
+        <activity android:name=".PdfViewerActivity" />
         <activity android:name=".SmartScannerActivity" />
         <activity android:name=".DocumentsActivity" />
         <activity android:name=".ScannerActivity" />
