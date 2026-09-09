@@ -14,7 +14,7 @@ object AiLibraryAssistant {
         runCatching {
             val scans = File(filesDir, "scans")
             val context = buildContext(scans, question)
-            if (context.isBlank()) return@runCatching "No indexed documents yet."
+            if (context.isBlank()) return@runCatching noDocumentsMessage()
             tryCloud(question, context).getOrElse { localAnswer(question, context) }
         }
     }
@@ -62,8 +62,38 @@ object AiLibraryAssistant {
         val lines = context.split("\n---\n")
         val tokens = normalize(question).split(" ").filter { it.length >= 3 && it !in STOP_WORDS }
         val matches = lines.filter { block -> tokens.any { normalize(block).contains(it) } }.take(3)
-        return if (matches.isEmpty()) "No sufficient information was found in the library to answer that question."
-        else "Cloud AI is unavailable. Related local documents:\n\n" + matches.joinToString("\n\n---\n\n")
+        val language = Locale.getDefault().language.lowercase(Locale.ROOT)
+        if (matches.isEmpty()) return insufficientMessage(language)
+        val prefix = when (language) {
+            "es" -> "La IA en la nube no está disponible. Documentos locales relacionados:"
+            "fr" -> "L’IA cloud n’est pas disponible. Documents locaux associés :"
+            "de" -> "Cloud-KI ist nicht verfügbar. Verwandte lokale Dokumente:"
+            "it" -> "L’IA cloud non è disponibile. Documenti locali correlati:"
+            "pt" -> "A IA na nuvem não está disponível. Documentos locais relacionados:"
+            "ca" -> "La IA al núvol no està disponible. Documents locals relacionats:"
+            else -> "Cloud AI is unavailable. Related local documents:"
+        }
+        return prefix + "\n\n" + matches.joinToString("\n\n---\n\n")
+    }
+
+    private fun noDocumentsMessage(): String = when (Locale.getDefault().language.lowercase(Locale.ROOT)) {
+        "es" -> "No hay documentos indexados todavía."
+        "fr" -> "Aucun document n’est encore indexé."
+        "de" -> "Noch keine Dokumente indiziert."
+        "it" -> "Nessun documento indicizzato."
+        "pt" -> "Ainda não existem documentos indexados."
+        "ca" -> "Encara no hi ha documents indexats."
+        else -> "There are no indexed documents yet."
+    }
+
+    private fun insufficientMessage(language: String): String = when (language) {
+        "es" -> "No encuentro información suficiente en la biblioteca para responder a esa pregunta."
+        "fr" -> "Je ne trouve pas suffisamment d’informations dans la bibliothèque pour répondre."
+        "de" -> "Ich finde in der Bibliothek nicht genügend Informationen für diese Frage."
+        "it" -> "Non trovo informazioni sufficienti nella libreria per rispondere."
+        "pt" -> "Não encontro informação suficiente na biblioteca para responder."
+        "ca" -> "No trobo prou informació a la biblioteca per respondre."
+        else -> "I cannot find enough information in the library to answer that question."
     }
 
     private fun languageName(): String = when (Locale.getDefault().language.lowercase(Locale.ROOT)) {
@@ -87,5 +117,5 @@ object AiLibraryAssistant {
 
     private fun normalize(value: String): String = java.text.Normalizer.normalize(value.lowercase(Locale.ROOT), java.text.Normalizer.Form.NFD).replace("\\p{InCombiningDiacriticalMarks}+".toRegex(), "")
 
-    private val STOP_WORDS = setOf("the", "and", "for", "with", "what", "which", "this", "that", "from", "para", "con", "que", "las", "los", "una", "uno", "por", "del", "como", "est", "des", "les", "une", "pour", "und", "der", "die", "das", "mit", "ein", "eine", "per", "gli", "che", "una", "dos", "não", "uma", "com", "dos")
+    private val STOP_WORDS = setOf("the", "and", "for", "with", "what", "which", "this", "that", "from", "para", "con", "que", "las", "los", "una", "uno", "por", "del", "como", "est", "des", "les", "une", "pour", "und", "der", "die", "das", "mit", "ein", "eine", "per", "gli", "che", "uma", "com", "dos")
 }
