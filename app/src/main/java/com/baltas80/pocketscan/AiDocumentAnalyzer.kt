@@ -5,6 +5,7 @@ import com.google.firebase.ai.GenerativeModel
 import com.google.firebase.ai.ai
 import com.google.firebase.ai.type.GenerativeBackend
 import com.google.firebase.ai.type.Schema
+import com.google.firebase.ai.type.content
 import com.google.firebase.ai.type.generationConfig
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
@@ -76,7 +77,7 @@ object AiDocumentAnalyzer {
 
         val auxiliaryOcr = ocrText.take(12000)
         val prompt = content {
-            inlineData(bytes = file.readBytes(), mimeType = "application/pdf")
+            inlineData(file.readBytes(), "application/pdf")
             text(
                 """
                 You are PocketScan's document intelligence engine. Analyze the complete PDF, including layout, tables and visible values. OCR text below is only auxiliary context.
