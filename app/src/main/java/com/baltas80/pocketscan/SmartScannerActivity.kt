@@ -75,17 +75,18 @@ class SmartScannerActivity : AppCompatActivity() {
                         FileOutputStream(pdfFile).use { output -> input.copyTo(output) }
                     }
 
-                    val enhancedPages = pages.mapIndexedNotNull { index, page ->
+                    val enhancedPages = pages.mapIndexed { index, page ->
                         val enhanced = File(pageDir, "page-${index + 1}.jpg")
                         if (DocumentImageEnhancer.enhanceToJpeg(this@SmartScannerActivity, page.imageUri, enhanced)) enhanced else null
                     }
+                    val usableEnhancedPages = enhancedPages.filterNotNull()
 
                     // The Google scanner preview has its own "Mejorar" control. After the
                     // scanner returns, PocketScan applies a second local pass so saved PDFs
                     // and OCR retain readable text even when the source page is washed out.
-                    if (enhancedPages.size == pages.size) {
+                    if (usableEnhancedPages.size == pages.size) {
                         val improvedPdf = File(dir, "document_$stamp.improved.pdf")
-                        if (DocumentImageEnhancer.buildPdfFromJpegs(enhancedPages, improvedPdf)) {
+                        if (DocumentImageEnhancer.buildPdfFromJpegs(usableEnhancedPages, improvedPdf)) {
                             pdfFile.delete()
                             improvedPdf.renameTo(pdfFile)
                         } else {
@@ -107,7 +108,9 @@ class SmartScannerActivity : AppCompatActivity() {
             }
             val (dir, pdfFile, textAndPages) = prepared
             val (textFile, enhancedPages) = textAndPages
-            val ocrUris = enhancedPages.map { Uri.fromFile(it) }
+            val ocrUris = pages.mapIndexed { index, page ->
+                enhancedPages[index]?.let { Uri.fromFile(it) } ?: page.imageUri
+            }
             runOcr(ocrUris, textFile) {
                 lifecycleScope.launch {
                     val saved = withContext(Dispatchers.IO) {
@@ -117,10 +120,10 @@ class SmartScannerActivity : AppCompatActivity() {
                         if (textFile.exists() && textFile.absolutePath != namedText.absolutePath) textFile.renameTo(namedText)
                         val category = DocumentOrganizer.categoryForText(ocrText)
                         val finalPdf = DocumentOrganizer.moveDocument(namedPdf, namedText, dir, category)
-                        Triple(category, finalPdf, enhancedPages.size)
+                        Triple(category, finalPdf, pages.size)
                     }
                     AiAnalysisScheduler.enqueue(this@SmartScannerActivity, saved.second)
-                    enhancedPages.forEach { it.delete() }
+                    enhancedPages.filterNotNull().forEach { it.delete() }
                     enhancedPages.firstOrNull()?.parentFile?.delete()
                     Toast.makeText(this@SmartScannerActivity, "Documento guardado en ${saved.first} (${saved.third} página(s))", Toast.LENGTH_SHORT).show()
                     finish()
