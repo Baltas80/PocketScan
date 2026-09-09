@@ -31,8 +31,10 @@ object AiLibraryAssistant {
     }
 
     private suspend fun tryCloud(question: String, context: String): Result<String> = runCatching {
-        val model: GenerativeModel = Firebase.ai(backend = GenerativeBackend.googleAI())
-            .generativeModel(AiModelConfig.modelName())
+        val model: GenerativeModel = Firebase.ai(
+            backend = GenerativeBackend.googleAI(),
+            useLimitedUseAppCheckTokens = true
+        ).generativeModel(AiModelConfig.modelName())
         val language = languageName()
         val prompt = """
             You are PocketScan's document library assistant.
