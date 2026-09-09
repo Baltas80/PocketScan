@@ -15,6 +15,10 @@ android {
         versionName = "0.1.0"
     }
 
+    buildFeatures {
+        buildConfig = true
+    }
+
     buildTypes {
         release {
             isMinifyEnabled = false
@@ -50,7 +54,11 @@ dependencies {
     implementation("com.google.android.gms:play-services-mlkit-text-recognition-korean:16.0.1")
     implementation("com.google.android.gms:play-services-mlkit-document-scanner:16.0.0")
 
-    // Gemini through Firebase AI Logic. Firebase/App Check configuration is supplied separately.
+    // Gemini through Firebase AI Logic.
     implementation(platform("com.google.firebase:firebase-bom:34.18.0"))
     implementation("com.google.firebase:firebase-ai")
+
+    // App Check: Play Integrity for production, Debug provider for local builds.
+    implementation("com.google.firebase:firebase-appcheck-playintegrity")
+    debugImplementation("com.google.firebase:firebase-appcheck-debug")
 }
