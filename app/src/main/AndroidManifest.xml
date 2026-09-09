@@ -2,38 +2,21 @@
 <manifest xmlns:android="http://schemas.android.com/apk/res/android">
     <uses-permission android:name="android.permission.CAMERA" />
     <uses-permission android:name="android.permission.USE_BIOMETRIC" />
-
-    <application
-        android:allowBackup="true"
-        android:label="PocketScan"
-        android:supportsRtl="true"
-        android:theme="@style/Theme.PocketScan">
-
-        <meta-data
-            android:name="com.google.mlkit.vision.DEPENDENCIES"
-            android:value="ocr" />
-
+    <application android:allowBackup="true" android:label="PocketScan" android:supportsRtl="true" android:theme="@style/Theme.PocketScan">
+        <meta-data android:name="com.google.mlkit.vision.DEPENDENCIES" android:value="ocr" />
+        <activity android:name=".AiAssistantActivity" />
         <activity android:name=".PdfViewerActivity" />
         <activity android:name=".SmartScannerActivity" />
         <activity android:name=".DocumentsActivity" />
         <activity android:name=".ScannerActivity" />
-        <activity
-            android:name=".MainActivity"
-            android:exported="true">
+        <activity android:name=".MainActivity" android:exported="true">
             <intent-filter>
                 <action android:name="android.intent.action.MAIN" />
                 <category android:name="android.intent.category.LAUNCHER" />
             </intent-filter>
         </activity>
-
-        <provider
-            android:name="androidx.core.content.FileProvider"
-            android:authorities="${applicationId}.fileprovider"
-            android:exported="false"
-            android:grantUriPermissions="true">
-            <meta-data
-                android:name="android.support.FILE_PROVIDER_PATHS"
-                android:resource="@xml/file_paths" />
+        <provider android:name="androidx.core.content.FileProvider" android:authorities="${applicationId}.fileprovider" android:exported="false" android:grantUriPermissions="true">
+            <meta-data android:name="android.support.FILE_PROVIDER_PATHS" android:resource="@xml/file_paths" />
         </provider>
     </application>
 </manifest>
