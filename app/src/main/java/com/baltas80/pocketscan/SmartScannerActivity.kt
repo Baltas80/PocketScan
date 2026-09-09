@@ -1,6 +1,5 @@
 package com.baltas80.pocketscan
 
-import android.content.Intent
 import android.net.Uri
 import android.os.Bundle
 import android.widget.Toast
@@ -43,8 +42,7 @@ class SmartScannerActivity : AppCompatActivity() {
             .setResultFormats(GmsDocumentScannerOptions.RESULT_FORMAT_JPEG, GmsDocumentScannerOptions.RESULT_FORMAT_PDF)
             .setScannerMode(GmsDocumentScannerOptions.SCANNER_MODE_FULL)
             .build()
-        val scanner = GmsDocumentScanning.getClient(options)
-        scanner.getStartScanIntent(this)
+        GmsDocumentScanning.getClient(options).getStartScanIntent(this)
             .addOnSuccessListener { intentSender -> scannerLauncher.launch(IntentSenderRequest.Builder(intentSender).build()) }
             .addOnFailureListener { error ->
                 Toast.makeText(this, error.message ?: "No se pudo iniciar el escáner", Toast.LENGTH_LONG).show(); finish()
@@ -65,13 +63,48 @@ class SmartScannerActivity : AppCompatActivity() {
             }
             val pages = result.pages.orEmpty()
             runOcr(pages.map { it.imageUri }, textFile) {
-                Toast.makeText(this, "Documento guardado (${pages.size} página(s))", Toast.LENGTH_SHORT).show(); finish()
+                val ocrText = textFile.takeIf { it.exists() }?.readText(Charsets.UTF_8).orEmpty()
+                val namedPdf = autoNameDocument(pdfFile, ocrText)
+                val namedText = File(namedPdf.parentFile, namedPdf.nameWithoutExtension + ".txt")
+                if (textFile.exists() && textFile.absolutePath != namedText.absolutePath) textFile.renameTo(namedText)
+                val category = DocumentOrganizer.categoryForText(ocrText)
+                val finalPdf = DocumentOrganizer.moveDocument(namedPdf, namedText, dir, category)
+                Toast.makeText(this, "Documento guardado en $category (${pages.size} página(s))", Toast.LENGTH_SHORT).show()
+                finish()
             }
         } catch (error: Exception) {
             pdfFile.delete(); textFile.delete()
             Toast.makeText(this, error.message ?: "No se pudo guardar el documento", Toast.LENGTH_LONG).show(); finish()
         }
     }
+
+    private fun autoNameDocument(pdf: File, text: String): File {
+        val type = when (DocumentOrganizer.categoryForText(text)) {
+            DocumentOrganizer.FACTURAS -> "Factura"
+            DocumentOrganizer.PRESUPUESTOS -> "Presupuesto"
+            DocumentOrganizer.CONTRATOS -> "Contrato"
+            DocumentOrganizer.RECIBOS -> "Recibo"
+            DocumentOrganizer.TICKETS -> "Ticket"
+            DocumentOrganizer.NOMINAS -> "Nomina"
+            DocumentOrganizer.CERTIFICADOS -> "Certificado"
+            DocumentOrganizer.INFORMES -> "Informe"
+            DocumentOrganizer.CITAS -> "Cita"
+            else -> "Documento"
+        }
+        val useful = text.lines().map { it.trim() }.firstOrNull { it.length >= 4 && !it.matches(Regex("[0-9 ./:-]+")) && !it.equals(type, true) }
+        val clean = sanitizeFileName(useful ?: type).take(45).trim().trim('.', '_', '-')
+        val base = sanitizeFileName("$type - $clean").take(80).trim().ifEmpty { "Documento" }
+        var target = File(pdf.parentFile, "$base.pdf")
+        var counter = 2
+        while (target.exists() && target.absolutePath != pdf.absolutePath) { target = File(pdf.parentFile, "$base ($counter).pdf"); counter++ }
+        return if (target.absolutePath == pdf.absolutePath || pdf.renameTo(target)) target else pdf
+    }
+
+    private fun sanitizeFileName(value: String): String =
+        java.text.Normalizer.normalize(value, java.text.Normalizer.Form.NFD)
+            .replace("\\p{InCombiningDiacriticalMarks}+".toRegex(), "")
+            .replace(Regex("[^A-Za-z0-9 _()-]"), "_")
+            .replace(Regex("\\s+"), " ").trim()
 
     private fun runOcr(uris: List<Uri>, textFile: File, onComplete: () -> Unit) {
         val recognizer = com.google.mlkit.vision.text.TextRecognition.getClient(com.google.mlkit.vision.text.latin.TextRecognizerOptions.DEFAULT_OPTIONS)
