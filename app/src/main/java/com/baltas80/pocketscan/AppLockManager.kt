@@ -34,11 +34,21 @@ object AppLockManager {
     }
 
     fun authenticateIfNeeded(activity: FragmentActivity, onBlocked: (() -> Unit)? = null) {
-        if (!isEnabled(activity)) return
-        if (System.currentTimeMillis() - lastAuthenticatedAt < GRACE_MS) return
-        authenticate(activity, "Desbloquea PocketScan") { success ->
+        ensureUnlocked(activity) { success ->
             if (!success) onBlocked?.invoke()
         }
+    }
+
+    fun ensureUnlocked(activity: FragmentActivity, onResult: (Boolean) -> Unit) {
+        if (!isEnabled(activity)) {
+            onResult(true)
+            return
+        }
+        if (System.currentTimeMillis() - lastAuthenticatedAt < GRACE_MS) {
+            onResult(true)
+            return
+        }
+        authenticate(activity, "Desbloquea PocketScan", onResult)
     }
 
     private fun authenticate(activity: FragmentActivity, title: String, onResult: (Boolean) -> Unit) {
