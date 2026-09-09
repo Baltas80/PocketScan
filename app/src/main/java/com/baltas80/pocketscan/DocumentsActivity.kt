@@ -50,13 +50,16 @@ class DocumentsActivity : AppCompatActivity() {
         recyclerView.layoutManager = LinearLayoutManager(this)
         recyclerView.adapter = adapter
 
-        val categories = listOf("Todas") + DocumentOrganizer.categories
+        val categories = listOf(getString(R.string.my_documents).let { "Todas" }) + DocumentOrganizer.categories
         categorySpinner.adapter = ArrayAdapter(this, android.R.layout.simple_spinner_dropdown_item, categories)
         categorySpinner.onItemSelectedListener = object : android.widget.AdapterView.OnItemSelectedListener {
             override fun onNothingSelected(parent: android.widget.AdapterView<*>?) = Unit
             override fun onItemSelected(parent: android.widget.AdapterView<*>?, view: android.view.View?, position: Int, id: Long) = applyFilters()
         }
         findViewById<Button>(R.id.importButton).setOnClickListener { importImagesLauncher.launch("image/*") }
+        findViewById<Button>(R.id.aiLibraryButton).setOnClickListener {
+            startActivity(Intent(this, AiAssistantActivity::class.java))
+        }
         searchInput.addTextChangedListener(object : TextWatcher {
             override fun beforeTextChanged(s: CharSequence?, start: Int, count: Int, after: Int) = Unit
             override fun onTextChanged(s: CharSequence?, start: Int, before: Int, count: Int) = applyFilters()
@@ -93,8 +96,10 @@ class DocumentsActivity : AppCompatActivity() {
                     if (selected != "Todas" && category != selected) return@filter false
                     if (query.isEmpty()) return@filter true
                     if (file.nameWithoutExtension.lowercase().contains(query)) return@filter true
-                    val sidecar = File(file.parentFile, file.nameWithoutExtension + ".txt")
-                    sidecar.exists() && runCatching { sidecar.readText(Charsets.UTF_8).lowercase().contains(query) }.getOrDefault(false)
+                    val textSidecar = File(file.parentFile, file.nameWithoutExtension + ".txt")
+                    if (textSidecar.exists() && runCatching { textSidecar.readText(Charsets.UTF_8).lowercase().contains(query) }.getOrDefault(false)) return@filter true
+                    val analysis = AiMetadataStore.load(file)
+                    analysis != null && normalizeSearch(listOf(analysis.title, analysis.summary, analysis.category, analysis.fields.values.joinToString(" ")).joinToString(" ")).contains(normalizeSearch(query))
                 }
             }
             if (isFinishing || isDestroyed) return@launch
@@ -120,20 +125,20 @@ class DocumentsActivity : AppCompatActivity() {
         lifecycleScope.launch {
             val result = withContext(Dispatchers.IO) { prepareImportedImages(uris) }
             if (result == null) {
-                Toast.makeText(this@DocumentsActivity, "No se pudo importar", Toast.LENGTH_LONG).show(); return@launch
+                Toast.makeText(this@DocumentsActivity, R.string.import_failed, Toast.LENGTH_LONG).show(); return@launch
             }
             val (tempFiles, pdf, text) = result
             createPdfFromImagesAsync(tempFiles, pdf) { pdfCreated ->
                 if (!pdfCreated) {
                     tempFiles.forEach { it.delete() }; pdf.delete(); text.delete()
-                    Toast.makeText(this@DocumentsActivity, "No se pudo crear el PDF", Toast.LENGTH_LONG).show(); return@createPdfFromImagesAsync
+                    Toast.makeText(this@DocumentsActivity, R.string.pdf_failed, Toast.LENGTH_LONG).show(); return@createPdfFromImagesAsync
                 }
                 runOcr(tempFiles, text) {
                     lifecycleScope.launch {
                         val category = withContext(Dispatchers.IO) {
                             tempFiles.forEach { it.delete() }
                             val ocr = runCatching { text.readText(Charsets.UTF_8) }.getOrDefault("")
-                            val renamedPdf = autoNameDocument(pdf, ocr, "Documento importado")
+                            val renamedPdf = autoNameDocument(pdf, ocr, getString(R.string.my_documents))
                             val finalText = File(renamedPdf.parentFile, renamedPdf.nameWithoutExtension + ".txt")
                             if (text.exists() && text.absolutePath != finalText.absolutePath) text.renameTo(finalText)
                             val finalOcr = runCatching { finalText.takeIf { it.exists() }?.readText(Charsets.UTF_8).orEmpty() }.getOrDefault(ocr)
@@ -142,7 +147,7 @@ class DocumentsActivity : AppCompatActivity() {
                             detected
                         }
                         loadDocuments()
-                        Toast.makeText(this@DocumentsActivity, "Documento importado en $category", Toast.LENGTH_SHORT).show()
+                        Toast.makeText(this@DocumentsActivity, getString(R.string.document_imported, category), Toast.LENGTH_SHORT).show()
                     }
                 }
             }
@@ -249,6 +254,8 @@ class DocumentsActivity : AppCompatActivity() {
         return withoutAccents.replace(Regex("[^A-Za-z0-9 _()-]"), "_").replace(Regex("\\s+"), " ").trim()
     }
 
+    private fun normalizeSearch(value: String): String = Normalizer.normalize(value.lowercase(), Normalizer.Form.NFD).replace("\\p{InCombiningDiacriticalMarks}+".toRegex(), "")
+
     private fun renameDocument(file: File) {
         val input = EditText(this).apply { setText(file.nameWithoutExtension); selectAll() }
         AlertDialog.Builder(this).setTitle(R.string.rename_document).setView(input)
@@ -261,7 +268,9 @@ class DocumentsActivity : AppCompatActivity() {
                 lifecycleScope.launch {
                     val success = withContext(Dispatchers.IO) {
                         if (!file.renameTo(target)) false else {
-                            File(file.parentFile, file.nameWithoutExtension + ".txt").renameTo(File(file.parentFile, "$newName.txt")); true
+                            File(file.parentFile, file.nameWithoutExtension + ".txt").renameTo(File(file.parentFile, "$newName.txt"))
+                            val aiSidecar = File(file.parentFile, file.nameWithoutExtension + ".ai.json")
+                            aiSidecar.renameTo(File(file.parentFile, "$newName.ai.json")); true
                         }
                     }
                     if (success) loadDocuments() else Toast.makeText(this@DocumentsActivity, R.string.rename_failed, Toast.LENGTH_SHORT).show()
@@ -275,7 +284,7 @@ class DocumentsActivity : AppCompatActivity() {
             .setPositiveButton(R.string.delete) { _, _ ->
                 lifecycleScope.launch {
                     val deleted = withContext(Dispatchers.IO) {
-                        val result = file.delete(); File(file.parentFile, file.nameWithoutExtension + ".txt").delete(); result
+                        val result = file.delete(); File(file.parentFile, file.nameWithoutExtension + ".txt").delete(); AiMetadataStore.delete(file); result
                     }
                     if (deleted) loadDocuments() else Toast.makeText(this@DocumentsActivity, R.string.delete_failed, Toast.LENGTH_SHORT).show()
                 }
