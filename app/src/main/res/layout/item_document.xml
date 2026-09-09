@@ -9,6 +9,8 @@
         android:id="@+id/documentName"
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
+        android:maxLines="2"
+        android:ellipsize="end"
         android:textSize="17sp"
         android:textStyle="bold" />
 
@@ -29,10 +31,21 @@
     <LinearLayout
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
-        android:layout_marginTop="6dp">
-        <Button android:id="@+id/openButton" android:layout_width="0dp" android:layout_height="wrap_content" android:layout_weight="1" android:text="Abrir" />
-        <Button android:id="@+id/shareButton" android:layout_width="0dp" android:layout_height="wrap_content" android:layout_weight="1" android:text="Compartir" />
-        <Button android:id="@+id/renameButton" android:layout_width="0dp" android:layout_height="wrap_content" android:layout_weight="1" android:text="Renombrar" />
-        <Button android:id="@+id/deleteButton" android:layout_width="0dp" android:layout_height="wrap_content" android:layout_weight="1" android:text="Borrar" />
+        android:layout_marginTop="6dp"
+        android:orientation="vertical">
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:orientation="horizontal">
+            <Button android:id="@+id/openButton" android:layout_width="0dp" android:layout_height="wrap_content" android:layout_weight="1" android:minHeight="48dp" android:text="Abrir" />
+            <Button android:id="@+id/shareButton" android:layout_width="0dp" android:layout_height="wrap_content" android:layout_weight="1" android:minHeight="48dp" android:layout_marginStart="6dp" android:text="Compartir" />
+        </LinearLayout>
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:orientation="horizontal">
+            <Button android:id="@+id/renameButton" android:layout_width="0dp" android:layout_height="wrap_content" android:layout_weight="1" android:minHeight="48dp" android:text="Renombrar" />
+            <Button android:id="@+id/deleteButton" android:layout_width="0dp" android:layout_height="wrap_content" android:layout_weight="1" android:minHeight="48dp" android:layout_marginStart="6dp" android:text="Borrar" />
+        </LinearLayout>
     </LinearLayout>
 </LinearLayout>
