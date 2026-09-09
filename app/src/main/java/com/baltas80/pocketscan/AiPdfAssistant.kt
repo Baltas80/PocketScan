@@ -14,8 +14,13 @@ import java.io.File
 import java.util.Locale
 
 object AiPdfAssistant {
+    private const val MAX_INLINE_PDF_BYTES = 14_000_000L
+
     suspend fun answerStream(file: File, ocrText: String, question: String): Flow<String> = withContext(Dispatchers.IO) {
         require(file.isFile) { "Document not found" }
+        require(file.length() <= MAX_INLINE_PDF_BYTES) {
+            "Este PDF supera el límite de análisis IA directo."
+        }
         val model: GenerativeModel = Firebase.ai(backend = GenerativeBackend.googleAI())
             .generativeModel("gemini-3.8-flash")
         val prompt = content {
