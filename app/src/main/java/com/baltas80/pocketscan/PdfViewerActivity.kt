@@ -34,20 +34,12 @@ class PdfViewerActivity : AppCompatActivity() {
 
     private val textExportLauncher = registerForActivityResult(CreateDocument("text/plain")) { uri ->
         if (uri == null) return@registerForActivityResult
-        lifecycleScope.launch(Dispatchers.IO) {
-            val success = runCatching {
-                contentResolver.openOutputStream(uri)?.use { output ->
-                    output.write(pendingText.toByteArray(Charsets.UTF_8))
-                } ?: false
-            }.getOrDefault(false)
-            withContext(Dispatchers.Main) {
-                Toast.makeText(
-                    this@PdfViewerActivity,
-                    if (success) "Texto exportado correctamente" else "No se pudo exportar el texto",
-                    Toast.LENGTH_LONG
-                ).show()
-            }
-        }
+        writePendingText(uri)
+    }
+
+    private val correctedTextExportLauncher = registerForActivityResult(CreateDocument("text/plain")) { uri ->
+        if (uri == null) return@registerForActivityResult
+        writePendingText(uri)
     }
 
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -64,6 +56,7 @@ class PdfViewerActivity : AppCompatActivity() {
         findViewById<TextView>(R.id.viewerTitle).text = pdfFile.name
         findViewById<Button>(R.id.viewerAi).setOnClickListener { analyzeWithAi() }
         findViewById<Button>(R.id.viewerAsk).setOnClickListener { askAboutDocument() }
+        findViewById<Button>(R.id.viewerCorrectOcr).setOnClickListener { correctOcrWithAi() }
         findViewById<Button>(R.id.viewerExportText).setOnClickListener { exportOcrText() }
         findViewById<Button>(R.id.viewerShare).setOnClickListener { shareDocument() }
         findViewById<Button>(R.id.viewerClose).setOnClickListener { finish() }
@@ -100,6 +93,51 @@ class PdfViewerActivity : AppCompatActivity() {
             pendingText = text + "\n"
             val baseName = pdfFile.nameWithoutExtension.ifBlank { "documento" }
             textExportLauncher.launch("$baseName.txt")
+        }
+    }
+
+    private fun correctOcrWithAi() {
+        val button = findViewById<Button>(R.id.viewerCorrectOcr)
+        button.isEnabled = false
+        lifecycleScope.launch {
+            try {
+                val ocr = withContext(Dispatchers.IO) { readOcr().trim() }
+                if (ocr.isBlank()) {
+                    Toast.makeText(this@PdfViewerActivity, "Este documento no tiene texto OCR disponible", Toast.LENGTH_LONG).show()
+                    return@launch
+                }
+                Toast.makeText(this@PdfViewerActivity, "Corrigiendo errores de OCR con IA…", Toast.LENGTH_SHORT).show()
+                val corrected = AiPdfAssistant.correctOcr(ocr).trim()
+                if (corrected.isBlank()) throw IllegalStateException("La IA no devolvió texto corregido")
+                pendingText = corrected + "\n"
+                val baseName = pdfFile.nameWithoutExtension.ifBlank { "documento" }
+                correctedTextExportLauncher.launch("$baseName-corregido.txt")
+            } catch (error: Throwable) {
+                Toast.makeText(
+                    this@PdfViewerActivity,
+                    error.message ?: "No se pudo corregir el OCR",
+                    Toast.LENGTH_LONG
+                ).show()
+            } finally {
+                button.isEnabled = true
+            }
+        }
+    }
+
+    private fun writePendingText(uri: Uri) {
+        lifecycleScope.launch(Dispatchers.IO) {
+            val success = runCatching {
+                contentResolver.openOutputStream(uri)?.use { output ->
+                    output.write(pendingText.toByteArray(Charsets.UTF_8))
+                } ?: false
+            }.getOrDefault(false)
+            withContext(Dispatchers.Main) {
+                Toast.makeText(
+                    this@PdfViewerActivity,
+                    if (success) "Texto exportado correctamente" else "No se pudo exportar el texto",
+                    Toast.LENGTH_LONG
+                ).show()
+            }
         }
     }
 
