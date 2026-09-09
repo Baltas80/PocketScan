@@ -22,7 +22,7 @@ object AiAnalysisScheduler {
 
         WorkManager.getInstance(context.applicationContext).enqueueUniqueWork(
             UNIQUE_PREFIX + document.absolutePath.hashCode(),
-            ExistingWorkPolicy.REPLACE,
+            ExistingWorkPolicy.KEEP,
             request
         )
     }
