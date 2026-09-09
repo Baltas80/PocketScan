@@ -1,9 +1,9 @@
 package com.baltas80.pocketscan
 
 import com.google.firebase.Firebase
-import com.google.firebase.ai.GenerativeBackend
 import com.google.firebase.ai.GenerativeModel
 import com.google.firebase.ai.ai
+import com.google.firebase.ai.type.GenerativeBackend
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import org.json.JSONObject
