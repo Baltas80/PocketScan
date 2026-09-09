@@ -52,6 +52,14 @@
             android:minHeight="48dp"
             android:layout_marginStart="6dp"
             android:text="Preguntar" />
+        <Button
+            android:id="@+id/viewerCorrectOcr"
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_weight="1"
+            android:minHeight="48dp"
+            android:layout_marginStart="6dp"
+            android:text="Corregir OCR" />
     </LinearLayout>
 
     <LinearLayout
