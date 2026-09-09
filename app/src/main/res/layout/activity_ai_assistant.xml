@@ -1,50 +1,7 @@
-<?xml version="1.0" encoding="utf-8"?>
-<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
-    android:layout_width="match_parent"
-    android:layout_height="match_parent"
-    android:orientation="vertical"
-    android:padding="16dp">
-
-    <TextView
-        android:layout_width="match_parent"
-        android:layout_height="wrap_content"
-        android:text="Asistente inteligente"
-        android:textSize="24sp"
-        android:textStyle="bold" />
-
-    <TextView
-        android:layout_width="match_parent"
-        android:layout_height="wrap_content"
-        android:layout_marginTop="6dp"
-        android:text="Pregunta sobre tus documentos y PocketScan buscará en su biblioteca inteligente." />
-
-    <EditText
-        android:id="@+id/aiQuestion"
-        android:layout_width="match_parent"
-        android:layout_height="wrap_content"
-        android:layout_marginTop="16dp"
-        android:hint="Ej.: ¿Qué facturas tienen un importe superior?"
-        android:inputType="textCapSentences|textMultiLine"
-        android:minLines="2" />
-
-    <Button
-        android:id="@+id/aiAsk"
-        android:layout_width="match_parent"
-        android:layout_height="wrap_content"
-        android:layout_marginTop="10dp"
-        android:text="Preguntar" />
-
-    <ScrollView
-        android:layout_width="match_parent"
-        android:layout_height="0dp"
-        android:layout_marginTop="16dp"
-        android:layout_weight="1">
-        <TextView
-            android:id="@+id/aiAnswer"
-            android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            android:text="Aquí aparecerá la respuesta."
-            android:textIsSelectable="true"
-            android:textSize="16sp" />
-    </ScrollView>
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android" android:layout_width="match_parent" android:layout_height="match_parent" android:orientation="vertical" android:padding="16dp">
+    <TextView android:layout_width="match_parent" android:layout_height="wrap_content" android:text="@string/ai_assistant" android:textSize="24sp" android:textStyle="bold" />
+    <TextView android:layout_width="match_parent" android:layout_height="wrap_content" android:layout_marginTop="6dp" android:text="@string/ai_description" />
+    <EditText android:id="@+id/aiQuestion" android:layout_width="match_parent" android:layout_height="wrap_content" android:layout_marginTop="16dp" android:hint="@string/ai_question_hint" android:inputType="textCapSentences|textMultiLine" android:minLines="2" />
+    <Button android:id="@+id/aiAsk" android:layout_width="match_parent" android:layout_height="wrap_content" android:layout_marginTop="10dp" android:text="@string/ask" />
+    <ScrollView android:layout_width="match_parent" android:layout_height="0dp" android:layout_marginTop="16dp" android:layout_weight="1"><TextView android:id="@+id/aiAnswer" android:layout_width="match_parent" android:layout_height="wrap_content" android:text="@string/ai_answer_placeholder" android:textIsSelectable="true" android:textSize="16sp" /></ScrollView>
 </LinearLayout>
