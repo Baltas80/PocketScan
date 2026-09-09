@@ -19,6 +19,13 @@
         android:layout_marginHorizontal="12dp"
         android:text="Importar imágenes" />
 
+    <Spinner
+        android:id="@+id/categorySpinner"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_marginHorizontal="12dp"
+        android:contentDescription="Filtrar por categoría" />
+
     <EditText
         android:id="@+id/searchInput"
         android:layout_width="match_parent"
