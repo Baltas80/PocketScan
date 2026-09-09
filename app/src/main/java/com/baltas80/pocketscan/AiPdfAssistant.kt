@@ -16,6 +16,7 @@ import java.util.Locale
 
 object AiPdfAssistant {
     private const val MAX_INLINE_PDF_BYTES = 14_000_000L
+    private const val MAX_OCR_CORRECTION_CHARS = 30000
 
     suspend fun answerStream(file: File, ocrText: String, question: String): Flow<String> = withContext(Dispatchers.IO) {
         require(file.isFile) { "Document not found" }
@@ -54,6 +55,31 @@ object AiPdfAssistant {
                 emit(localAnswer(question, ocrText))
             }
         }
+    }
+
+    suspend fun correctOcr(ocrText: String): String = withContext(Dispatchers.IO) {
+        require(ocrText.isNotBlank()) { "No hay texto OCR para corregir" }
+        val source = ocrText.take(MAX_OCR_CORRECTION_CHARS)
+        val prompt = content {
+            text("""
+                You are PocketScan's OCR correction engine.
+                Correct ONLY obvious OCR recognition errors in the supplied scanned text.
+                Preserve the original meaning, names, numbers, dates, amounts, punctuation, paragraph order and page markers.
+                Do not summarize, rewrite, translate, add facts, or invent missing text.
+                If a word is ambiguous, keep the original OCR text rather than guessing.
+                Return ONLY the corrected plain text, with no explanation and no Markdown.
+
+                SCANNED OCR:
+                $source
+            """.trimIndent())
+        }
+        val model: GenerativeModel = Firebase.ai(
+            backend = GenerativeBackend.googleAI(),
+            useLimitedUseAppCheckTokens = true
+        ).generativeModel(AiModelConfig.modelName())
+        val response = model.generateContent(prompt)
+        response.text?.trim().takeUnless { it.isNullOrBlank() }
+            ?: throw IllegalStateException("La IA no devolvió texto corregido")
     }
 
     private fun localAnswer(question: String, ocrText: String): String {
