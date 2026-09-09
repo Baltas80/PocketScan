@@ -71,6 +71,7 @@ class PdfViewerActivity : AppCompatActivity() {
             val result = AiDocumentAnalyzer.analyze(pdfFile, ocr)
             findViewById<Button>(R.id.viewerAi).isEnabled = true
             result.onSuccess { analysis ->
+                AiMetadataStore.save(pdfFile, analysis)
                 val fields = analysis.fields.entries.joinToString("\n") { "${it.key}: ${it.value}" }
                 val message = buildString {
                     append("Categoría: ${analysis.category}\n")
