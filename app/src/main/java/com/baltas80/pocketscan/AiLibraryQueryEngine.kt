@@ -23,8 +23,10 @@ object AiLibraryQueryEngine {
     )
 
     private val stopWords = setOf(
-        "de", "del", "la", "el", "los", "las", "un", "una", "y", "en", "por", "para",
-        "con", "que", "me", "mis", "mi", "a", "al", "the", "of", "and", "in", "for", "with"
+        "de", "del", "la", "el", "los", "las", "un", "una", "y", "en", "por", "para", "con",
+        "que", "me", "mis", "mi", "a", "al", "the", "of", "and", "in", "for", "with", "what",
+        "which", "how", "much", "many", "show", "list", "find", "total", "suma", "sum", "cuanto",
+        "cuánto", "cuantas", "cuántas", "dime", "muestra", "buscar", "encuentra", "quiero", "hay"
     )
 
     private val categoryAliases = mapOf(
@@ -55,15 +57,16 @@ object AiLibraryQueryEngine {
             .filter { (file, analysis) ->
                 val corpus = normalize(buildCorpus(file, analysis))
                 val categoryOk = category == null || analysis?.category == category
-                val yearOk = year == null || extractYear(analysis?.fields?.get("fecha")) == year || corpus.contains(year.toString())
+                val yearOk = year == null || extractYear(analysis?.fields?.get("fecha")) == year
                 val amount = extractAmount(analysis?.fields?.get("total"))
                 val amountOk = amountFilter == null || amountFilter.matches(amount)
                 val lexicalScore = tokens.count { token -> corpus.contains(token) }
-                categoryOk && yearOk && amountOk && (tokens.isEmpty() || lexicalScore > 0)
+                val hasStructuredFilter = category != null || year != null || amountFilter != null
+                categoryOk && yearOk && amountOk && (tokens.isEmpty() || lexicalScore > 0 || hasStructuredFilter)
             }
             .map { (file, analysis) ->
                 val parsed = extractAmount(analysis?.fields?.get("total"))
-                Match(file, analysis, parsed?.first, parsed?.second)
+                Match(file, analysis, parsed?.first, parsed?.second?.takeIf { it.isNotBlank() })
             }
             .sortedBy { it.file.name.lowercase(Locale.ROOT) }
             .take(100)
@@ -88,7 +91,7 @@ object AiLibraryQueryEngine {
             append(index + 1).append(". FILE=").append(match.file.name)
             append(" | category=").append(a?.category ?: "GENERAL")
             append(" | title=").append(a?.title.orEmpty())
-            append(" | date=").append(a?.fields?.get("fecha" ).orEmpty())
+            append(" | date=").append(a?.fields?.get("fecha").orEmpty())
             append(" | supplier=").append(a?.fields?.get("proveedor").orEmpty())
             append(" | client=").append(a?.fields?.get("cliente").orEmpty())
             append(" | total=").append(a?.fields?.get("total").orEmpty())

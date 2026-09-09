@@ -19,6 +19,18 @@ class AiAssistantActivity : AppCompatActivity() {
         questionInput = findViewById(R.id.aiQuestion)
         answerView = findViewById(R.id.aiAnswer)
         findViewById<Button>(R.id.aiAsk).setOnClickListener { ask() }
+        findViewById<Button>(R.id.aiExampleInvoices).setOnClickListener {
+            questionInput.setText(getString(R.string.ai_example_invoices_question))
+            questionInput.setSelection(questionInput.text.length)
+        }
+        findViewById<Button>(R.id.aiExampleTotal).setOnClickListener {
+            questionInput.setText(getString(R.string.ai_example_total_question))
+            questionInput.setSelection(questionInput.text.length)
+        }
+        findViewById<Button>(R.id.aiExampleYear).setOnClickListener {
+            questionInput.setText(getString(R.string.ai_example_year_question))
+            questionInput.setSelection(questionInput.text.length)
+        }
     }
 
     override fun onResume() { super.onResume(); AppLockManager.authenticateIfNeeded(this) { finish() } }

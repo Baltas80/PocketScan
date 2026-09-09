@@ -13,70 +13,77 @@ object AiLibraryAssistant {
     suspend fun ask(filesDir: File, question: String): Result<String> = withContext(Dispatchers.IO) {
         runCatching {
             val scans = File(filesDir, "scans")
-            val context = buildContext(scans, question)
-            if (context.isBlank()) return@runCatching noDocumentsMessage()
-            tryCloud(question, context).getOrElse { localAnswer(question, context) }
+            if (!scans.isDirectory) return@runCatching noDocumentsMessage()
+
+            val documents = scans.walkTopDown()
+                .filter { it.isFile && it.extension.equals("pdf", true) }
+                .toList()
+            if (documents.isEmpty()) return@runCatching noDocumentsMessage()
+
+            val queryResult = AiLibraryQueryEngine.query(question, documents)
+            if (queryResult.matches.isEmpty()) return@runCatching insufficientMessage(languageCode())
+
+            val context = AiLibraryQueryEngine.buildContext(queryResult).take(30000)
+            tryCloud(question, context).getOrElse {
+                localAnswer(question, queryResult, context)
+            }
         }
     }
 
     private suspend fun tryCloud(question: String, context: String): Result<String> = runCatching {
-        val model: GenerativeModel = Firebase.ai(backend = GenerativeBackend.googleAI()).generativeModel("gemini-3.7-flash")
+        val model: GenerativeModel = Firebase.ai(backend = GenerativeBackend.googleAI())
+            .generativeModel("gemini-3.8-flash")
         val language = languageName()
         val prompt = """
-            You are PocketScan's document assistant.
-            Answer only using the provided library information.
-            If the information is insufficient, say so clearly and never invent facts.
-            You may compare documents and identify dates, amounts, categories and extracted fields.
-            Respond in the user's language: $language. Keep the answer concise.
+            You are PocketScan's document library assistant.
+            Answer ONLY from the structured library results supplied below. Never invent facts.
+            Respect the filters already applied by the local query engine.
+            If an aggregate total is supplied, use it exactly and do not recalculate it from unrelated values.
+            You may summarize, compare, count, and identify dates, suppliers, clients, categories and amounts.
+            Respond in the user's language: $language. Keep the answer concise and useful.
 
-            QUESTION:
+            USER QUESTION:
             $question
 
-            LIBRARY:
+            STRUCTURED LIBRARY RESULTS:
             $context
         """.trimIndent()
         model.generateContent(prompt).text?.trim()?.takeIf { it.isNotBlank() } ?: error("AI returned no answer")
     }
 
-    private fun buildContext(scans: File, question: String): String {
-        if (!scans.isDirectory) return ""
-        val queryTokens = normalize(question).split(" ").filter { it.length >= 3 && it !in STOP_WORDS }.toSet()
-        return scans.walkTopDown().filter { it.isFile && it.extension.equals("pdf", true) }.mapNotNull { pdf ->
-            val analysis = AiMetadataStore.load(pdf)
-            val ocr = File(pdf.parentFile, pdf.nameWithoutExtension + ".txt").takeIf { it.isFile }
-                ?.let { runCatching { it.readText(Charsets.UTF_8).take(4000) }.getOrDefault("") }.orEmpty()
-            val searchable = normalize(listOf(pdf.name, analysis?.title, analysis?.category, analysis?.summary, analysis?.fields?.values?.joinToString(" "), ocr).joinToString(" "))
-            val score = queryTokens.count { searchable.contains(it) }
-            if (score == 0 && queryTokens.isNotEmpty()) null else buildString {
-                append("DOCUMENT: ${pdf.name}\n")
-                analysis?.let {
-                    append("Category: ${it.category}\nTitle: ${it.title}\nSummary: ${it.summary}\n")
-                    if (it.fields.isNotEmpty()) append("Fields: ${it.fields.entries.joinToString { e -> "${e.key}=${e.value}" }}\n")
-                }
-                if (ocr.isNotBlank()) append("OCR: $ocr\n")
+    private fun localAnswer(
+        question: String,
+        result: AiLibraryQueryEngine.Result,
+        context: String
+    ): String {
+        val language = languageCode()
+        val asksTotal = normalize(question).contains("total") || normalize(question).contains("cuanto") || normalize(question).contains("suma") || normalize(question).contains("sum")
+        if (asksTotal && result.aggregateTotal != null && result.aggregateCurrency != null) {
+            val formatted = "%.2f".format(Locale.US, result.aggregateTotal)
+            return when (language) {
+                "es" -> "Total de los ${result.matches.size} documentos encontrados: $formatted ${result.aggregateCurrency}."
+                "fr" -> "Total des ${result.matches.size} documents trouvés : $formatted ${result.aggregateCurrency}."
+                "de" -> "Gesamtsumme der ${result.matches.size} gefundenen Dokumente: $formatted ${result.aggregateCurrency}."
+                "it" -> "Totale dei ${result.matches.size} documenti trovati: $formatted ${result.aggregateCurrency}."
+                "pt" -> "Total dos ${result.matches.size} documentos encontrados: $formatted ${result.aggregateCurrency}."
+                "ca" -> "Total dels ${result.matches.size} documents trobats: $formatted ${result.aggregateCurrency}."
+                else -> "Total for the ${result.matches.size} matching documents: $formatted ${result.aggregateCurrency}."
             }
-        }.sortedByDescending { block -> queryTokens.count { normalize(block).contains(it) } }.take(8).joinToString("\n---\n").take(30000)
-    }
-
-    private fun localAnswer(question: String, context: String): String {
-        val lines = context.split("\n---\n")
-        val tokens = normalize(question).split(" ").filter { it.length >= 3 && it !in STOP_WORDS }
-        val matches = lines.filter { block -> tokens.any { normalize(block).contains(it) } }.take(3)
-        val language = Locale.getDefault().language.lowercase(Locale.ROOT)
-        if (matches.isEmpty()) return insufficientMessage(language)
-        val prefix = when (language) {
-            "es" -> "La IA en la nube no está disponible. Documentos locales relacionados:"
-            "fr" -> "L’IA cloud n’est pas disponible. Documents locaux associés :"
-            "de" -> "Cloud-KI ist nicht verfügbar. Verwandte lokale Dokumente:"
-            "it" -> "L’IA cloud non è disponibile. Documenti locali correlati:"
-            "pt" -> "A IA na nuvem não está disponível. Documentos locais relacionados:"
-            "ca" -> "La IA al núvol no està disponible. Documents locals relacionats:"
-            else -> "Cloud AI is unavailable. Related local documents:"
         }
-        return prefix + "\n\n" + matches.joinToString("\n\n---\n\n")
+
+        val heading = when (language) {
+            "es" -> "La IA en la nube no está disponible. Resultados locales:"
+            "fr" -> "L’IA cloud n’est pas disponible. Résultats locaux :"
+            "de" -> "Cloud-KI ist nicht verfügbar. Lokale Ergebnisse:"
+            "it" -> "L’IA cloud non è disponibile. Risultati locali:"
+            "pt" -> "A IA na nuvem não está disponível. Resultados locais:"
+            "ca" -> "La IA al núvol no està disponible. Resultats locals:"
+            else -> "Cloud AI is unavailable. Local results:"
+        }
+        return "$heading\n\n${context.take(12000)}"
     }
 
-    private fun noDocumentsMessage(): String = when (Locale.getDefault().language.lowercase(Locale.ROOT)) {
+    private fun noDocumentsMessage(): String = when (languageCode()) {
         "es" -> "No hay documentos indexados todavía."
         "fr" -> "Aucun document n’est encore indexé."
         "de" -> "Noch keine Dokumente indiziert."
@@ -96,7 +103,9 @@ object AiLibraryAssistant {
         else -> "I cannot find enough information in the library to answer that question."
     }
 
-    private fun languageName(): String = when (Locale.getDefault().language.lowercase(Locale.ROOT)) {
+    private fun languageCode(): String = Locale.getDefault().language.lowercase(Locale.ROOT)
+
+    private fun languageName(): String = when (languageCode()) {
         "es" -> "Spanish"
         "en" -> "English"
         "fr" -> "French"
@@ -115,7 +124,8 @@ object AiLibraryAssistant {
         else -> "English"
     }
 
-    private fun normalize(value: String): String = java.text.Normalizer.normalize(value.lowercase(Locale.ROOT), java.text.Normalizer.Form.NFD).replace("\\p{InCombiningDiacriticalMarks}+".toRegex(), "")
-
-    private val STOP_WORDS = setOf("the", "and", "for", "with", "what", "which", "this", "that", "from", "para", "con", "que", "las", "los", "una", "uno", "por", "del", "como", "est", "des", "les", "une", "pour", "und", "der", "die", "das", "mit", "ein", "eine", "per", "gli", "che", "uma", "com", "dos")
+    private fun normalize(value: String): String = java.text.Normalizer.normalize(
+        value.lowercase(Locale.ROOT),
+        java.text.Normalizer.Form.NFD
+    ).replace("\\p{InCombiningDiacriticalMarks}+".toRegex(), "")
 }
