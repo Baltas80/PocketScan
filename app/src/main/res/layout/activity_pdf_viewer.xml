@@ -9,7 +9,10 @@
         android:layout_height="wrap_content"
         android:gravity="center_vertical"
         android:orientation="horizontal"
-        android:padding="8dp">
+        android:paddingStart="8dp"
+        android:paddingTop="4dp"
+        android:paddingEnd="8dp"
+        android:paddingBottom="2dp">
 
         <TextView
             android:id="@+id/viewerTitle"
@@ -21,28 +24,42 @@
             android:textStyle="bold" />
 
         <Button
-            android:id="@+id/viewerAi"
-            android:layout_width="wrap_content"
-            android:layout_height="wrap_content"
-            android:text="IA" />
-
-        <Button
-            android:id="@+id/viewerAsk"
-            android:layout_width="wrap_content"
-            android:layout_height="wrap_content"
-            android:text="Preguntar" />
-
-        <Button
-            android:id="@+id/viewerShare"
-            android:layout_width="wrap_content"
-            android:layout_height="wrap_content"
-            android:text="Compartir" />
-
-        <Button
             android:id="@+id/viewerClose"
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
+            android:minHeight="48dp"
             android:text="Cerrar" />
+    </LinearLayout>
+
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:orientation="horizontal"
+        android:paddingStart="8dp"
+        android:paddingEnd="8dp">
+        <Button
+            android:id="@+id/viewerAi"
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_weight="1"
+            android:minHeight="48dp"
+            android:text="IA" />
+        <Button
+            android:id="@+id/viewerAsk"
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_weight="1"
+            android:minHeight="48dp"
+            android:layout_marginStart="6dp"
+            android:text="Preguntar" />
+        <Button
+            android:id="@+id/viewerShare"
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_weight="1"
+            android:minHeight="48dp"
+            android:layout_marginStart="6dp"
+            android:text="Compartir" />
     </LinearLayout>
 
     <androidx.recyclerview.widget.RecyclerView
