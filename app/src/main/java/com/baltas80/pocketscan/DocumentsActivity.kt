@@ -45,7 +45,11 @@ class DocumentsActivity : AppCompatActivity() {
         })
     }
 
-    override fun onResume() { super.onResume(); loadDocuments() }
+    override fun onResume() {
+        super.onResume()
+        AppLockManager.authenticateIfNeeded(this) { finish() }
+        loadDocuments()
+    }
 
     private fun loadDocuments() {
         val dir = File(filesDir, "scans")
@@ -173,9 +177,8 @@ class DocumentsActivity : AppCompatActivity() {
                 if (newName.isEmpty()) return@setPositiveButton
                 val target = File(file.parentFile, "$newName.pdf")
                 if (target.exists()) { Toast.makeText(this, R.string.file_already_exists, Toast.LENGTH_SHORT).show(); return@setPositiveButton }
-                if (file.renameTo(target)) {
-                    File(file.parentFile, file.nameWithoutExtension + ".txt").renameTo(File(file.parentFile, "$newName.txt")); loadDocuments()
-                } else Toast.makeText(this, R.string.rename_failed, Toast.LENGTH_SHORT).show()
+                if (file.renameTo(target)) { File(file.parentFile, file.nameWithoutExtension + ".txt").renameTo(File(file.parentFile, "$newName.txt")); loadDocuments() }
+                else Toast.makeText(this, R.string.rename_failed, Toast.LENGTH_SHORT).show()
             }.show()
     }
 
