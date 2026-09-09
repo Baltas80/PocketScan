@@ -21,8 +21,10 @@ object AiPdfAssistant {
         require(file.length() <= MAX_INLINE_PDF_BYTES) {
             "Este PDF supera el límite de análisis IA directo."
         }
-        val model: GenerativeModel = Firebase.ai(backend = GenerativeBackend.googleAI())
-            .generativeModel(AiModelConfig.modelName())
+        val model: GenerativeModel = Firebase.ai(
+            backend = GenerativeBackend.googleAI(),
+            useLimitedUseAppCheckTokens = true
+        ).generativeModel(AiModelConfig.modelName())
         val prompt = content {
             inlineData(file.readBytes(), "application/pdf")
             text("""
@@ -45,7 +47,7 @@ object AiPdfAssistant {
     }
 
     private fun languageName(): String = when (Locale.getDefault().language.lowercase(Locale.ROOT)) {
-        "es" -> "Spanish"
+        "es" -> "Spanish (Spain)"
         "en" -> "English"
         "fr" -> "French"
         "de" -> "German"
