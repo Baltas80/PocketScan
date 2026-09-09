@@ -141,7 +141,7 @@ class DocumentsActivity : AppCompatActivity() {
                 if (!pdfCreated) {
                     tempFiles.forEach { it.delete() }
                     pdf.delete(); text.delete()
-                    Toast.makeText(this, "No se pudo crear el PDF", Toast.LENGTH_LONG).show()
+                    Toast.makeText(this@DocumentsActivity, "No se pudo crear el PDF", Toast.LENGTH_LONG).show()
                     return@createPdfFromImagesAsync
                 }
                 runOcr(tempFiles, text) {
