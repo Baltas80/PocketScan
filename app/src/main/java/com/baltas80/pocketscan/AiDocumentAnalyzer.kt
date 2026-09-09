@@ -149,8 +149,18 @@ object AiDocumentAnalyzer {
     private fun firstMatch(text: String, regex: Regex): String? =
         regex.find(text)?.groupValues?.getOrNull(1)?.trim()?.takeIf { it.isNotEmpty() }
 
-    private fun normalizeCategory(value: String): String = value.trim().uppercase()
-        .let { if (it in DocumentOrganizer.categories) it else DocumentOrganizer.GENERAL }
+    private fun normalizeCategory(value: String): String = when (value.trim().uppercase(Locale.ROOT)) {
+        "FACTURAS" -> DocumentOrganizer.FACTURAS
+        "PRESUPUESTOS" -> DocumentOrganizer.PRESUPUESTOS
+        "CONTRATOS" -> DocumentOrganizer.CONTRATOS
+        "RECIBOS" -> DocumentOrganizer.RECIBOS
+        "TICKETS" -> DocumentOrganizer.TICKETS
+        "NOMINAS" -> DocumentOrganizer.NOMINAS
+        "CERTIFICADOS" -> DocumentOrganizer.CERTIFICADOS
+        "INFORMES" -> DocumentOrganizer.INFORMES
+        "CITAS" -> DocumentOrganizer.CITAS
+        else -> DocumentOrganizer.GENERAL
+    }
 
     private fun sanitizeTitle(value: String): String = value
         .replace(Regex("\\s+"), " ")
