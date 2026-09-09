@@ -57,7 +57,8 @@ object AiLibraryAssistant {
         context: String
     ): String {
         val language = languageCode()
-        val asksTotal = normalize(question).contains("total") || normalize(question).contains("cuanto") || normalize(question).contains("suma") || normalize(question).contains("sum")
+        val normalizedQuestion = normalize(question)
+        val asksTotal = normalizedQuestion.contains("total") || normalizedQuestion.contains("cuanto") || normalizedQuestion.contains("suma") || normalizedQuestion.contains("sum")
         if (asksTotal && result.aggregateTotal != null && result.aggregateCurrency != null) {
             val formatted = "%.2f".format(Locale.US, result.aggregateTotal)
             return when (language) {
