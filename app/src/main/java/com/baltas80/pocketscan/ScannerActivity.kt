@@ -27,6 +27,7 @@ import com.google.mlkit.vision.text.TextRecognition
 import com.google.mlkit.vision.text.latin.TextRecognizerOptions
 import java.io.File
 import java.io.FileOutputStream
+import java.text.Normalizer
 import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.Locale
@@ -135,10 +136,12 @@ class ScannerActivity : AppCompatActivity() {
 
         try {
             createPdf(pages, pdf)
-            runOcr(pages, text) {
+            runOcr(pages, text) { ocrText ->
                 pages.forEach { it.delete() }
+                val finalPdf = autoNameDocument(pdf, ocrText, "Documento")
+                if (finalPdf != pdf) text.renameTo(File(dir, finalPdf.nameWithoutExtension + ".txt"))
                 busy = false
-                Toast.makeText(this, "PDF guardado", Toast.LENGTH_SHORT).show()
+                Toast.makeText(this, "PDF guardado como ${finalPdf.name}", Toast.LENGTH_SHORT).show()
                 finish()
             }
         } catch (e: Exception) {
@@ -148,16 +151,17 @@ class ScannerActivity : AppCompatActivity() {
         }
     }
 
-    private fun runOcr(files: List<File>, textFile: File, onComplete: () -> Unit) {
+    private fun runOcr(files: List<File>, textFile: File, onComplete: (String) -> Unit) {
         val recognizer = TextRecognition.getClient(TextRecognizerOptions.DEFAULT_OPTIONS)
         val all = StringBuilder()
 
         fun complete() {
             try {
-                textFile.writeText(all.toString(), Charsets.UTF_8)
+                val result = all.toString()
+                textFile.writeText(result, Charsets.UTF_8)
+                onComplete(result)
             } finally {
                 recognizer.close()
-                onComplete()
             }
         }
 
@@ -185,6 +189,40 @@ class ScannerActivity : AppCompatActivity() {
         next(0)
     }
 
+    private fun autoNameDocument(pdf: File, ocrText: String, fallback: String): File {
+        val dir = pdf.parentFile ?: return pdf
+        val lines = ocrText.lines().map { it.trim() }.filter { it.length >= 4 }
+        val lower = ocrText.lowercase()
+        val type = listOf(
+            "factura" to "Factura", "invoice" to "Factura", "presupuesto" to "Presupuesto",
+            "contrato" to "Contrato", "recibo" to "Recibo", "ticket" to "Ticket",
+            "nómina" to "Nomina", "nomina" to "Nomina", "certificado" to "Certificado",
+            "informe" to "Informe", "cita" to "Cita"
+        ).firstOrNull { lower.contains(it.first) }?.second ?: fallback
+        val usefulLine = lines.firstOrNull { line ->
+            val value = line.lowercase()
+            !value.matches(Regex("[0-9 ./:-]+")) && value.length >= 4
+        } ?: type
+        val cleanLine = sanitizeFileName(usefulLine).take(45).trim().trim('.', '_', '-')
+        val base = sanitizeFileName(if (cleanLine.length >= 4) "$type - $cleanLine" else type)
+            .take(80).trim().ifEmpty { "Documento" }
+        var target = File(dir, "$base.pdf")
+        var counter = 2
+        while (target.exists() && target.absolutePath != pdf.absolutePath) {
+            target = File(dir, "$base ($counter).pdf")
+            counter++
+        }
+        if (target.absolutePath == pdf.absolutePath || !pdf.renameTo(target)) return pdf
+        return target
+    }
+
+    private fun sanitizeFileName(value: String): String {
+        val withoutAccents = Normalizer.normalize(value, Normalizer.Form.NFD)
+            .replace("\\p{InCombiningDiacriticalMarks}+".toRegex(), "")
+        return withoutAccents.replace(Regex("[^A-Za-z0-9 _()\-]"), "_")
+            .replace(Regex("\\s+"), " ").trim()
+    }
+
     private fun createPdf(files: List<File>, pdfFile: File) {
         val document = PdfDocument()
         try {
@@ -195,30 +233,19 @@ class ScannerActivity : AppCompatActivity() {
                 val pageInfo = PdfDocument.PageInfo.Builder(595, 842, index + 1).create()
                 val page = document.startPage(pageInfo)
                 val margin = 24f
-                val scale = minOf(
-                    (595f - margin * 2) / enhanced.width,
-                    (842f - margin * 2) / enhanced.height
-                )
+                val scale = minOf((595f - margin * 2) / enhanced.width, (842f - margin * 2) / enhanced.height)
                 val width = enhanced.width * scale
                 val height = enhanced.height * scale
                 val left = (595f - width) / 2f
                 val top = (842f - height) / 2f
-                page.canvas.drawBitmap(
-                    enhanced,
-                    null,
-                    android.graphics.RectF(left, top, left + width, top + height),
-                    Paint(Paint.ANTI_ALIAS_FLAG or Paint.FILTER_BITMAP_FLAG)
-                )
+                page.canvas.drawBitmap(enhanced, null, android.graphics.RectF(left, top, left + width, top + height), Paint(Paint.ANTI_ALIAS_FLAG or Paint.FILTER_BITMAP_FLAG))
                 document.finishPage(page)
-
                 if (enhanced !== rotated) enhanced.recycle()
                 if (rotated !== source) rotated.recycle()
                 source.recycle()
             }
             FileOutputStream(pdfFile).use { document.writeTo(it) }
-        } finally {
-            document.close()
-        }
+        } finally { document.close() }
     }
 
     private fun enhanceDocument(input: Bitmap): Bitmap {
@@ -232,20 +259,14 @@ class ScannerActivity : AppCompatActivity() {
             val r = ((android.graphics.Color.red(c) - 128) * contrast + 128 + brightness).toInt()
             val g = ((android.graphics.Color.green(c) - 128) * contrast + 128 + brightness).toInt()
             val b = ((android.graphics.Color.blue(c) - 128) * contrast + 128 + brightness).toInt()
-            pixels[i] = android.graphics.Color.argb(
-                android.graphics.Color.alpha(c),
-                max(0, min(255, r)),
-                max(0, min(255, g)),
-                max(0, min(255, b))
-            )
+            pixels[i] = android.graphics.Color.argb(android.graphics.Color.alpha(c), max(0, min(255, r)), max(0, min(255, g)), max(0, min(255, b)))
         }
         output.setPixels(pixels, 0, output.width, 0, 0, output.width, output.height)
         return output
     }
 
     private fun applyExifRotation(file: File, bitmap: Bitmap): Bitmap {
-        val orientation = ExifInterface(file.absolutePath)
-            .getAttributeInt(ExifInterface.TAG_ORIENTATION, ExifInterface.ORIENTATION_NORMAL)
+        val orientation = ExifInterface(file.absolutePath).getAttributeInt(ExifInterface.TAG_ORIENTATION, ExifInterface.ORIENTATION_NORMAL)
         val degrees = when (orientation) {
             ExifInterface.ORIENTATION_ROTATE_90 -> 90f
             ExifInterface.ORIENTATION_ROTATE_180 -> 180f
@@ -253,9 +274,6 @@ class ScannerActivity : AppCompatActivity() {
             else -> 0f
         }
         if (degrees == 0f) return bitmap
-        return Bitmap.createBitmap(
-            bitmap, 0, 0, bitmap.width, bitmap.height,
-            Matrix().apply { postRotate(degrees) }, true
-        )
+        return Bitmap.createBitmap(bitmap, 0, 0, bitmap.width, bitmap.height, Matrix().apply { postRotate(degrees) }, true)
     }
 }
