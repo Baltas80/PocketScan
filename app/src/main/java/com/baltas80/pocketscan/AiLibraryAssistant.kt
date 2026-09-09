@@ -25,7 +25,7 @@ object AiLibraryAssistant {
 
             val context = AiLibraryQueryEngine.buildContext(queryResult).take(30000)
             tryCloud(question, context).getOrElse {
-                localAnswer(question, queryResult, context)
+                localAnswer(question, queryResult)
             }
         }
     }
@@ -55,12 +55,25 @@ object AiLibraryAssistant {
 
     private fun localAnswer(
         question: String,
-        result: AiLibraryQueryEngine.Result,
-        context: String
+        result: AiLibraryQueryEngine.Result
     ): String {
         val language = languageCode()
         val normalizedQuestion = normalize(question)
         val asksTotal = normalizedQuestion.contains("total") || normalizedQuestion.contains("cuanto") || normalizedQuestion.contains("suma") || normalizedQuestion.contains("sum")
+        val asksCount = normalizedQuestion.contains("cuantas") || normalizedQuestion.contains("cuantos") || normalizedQuestion.contains("cantidad") || normalizedQuestion.contains("count") || normalizedQuestion.contains("how many")
+
+        if (asksCount) {
+            return when (language) {
+                "es" -> "Hay ${result.matches.size} documento${if (result.matches.size == 1) "" else "s"} que coincide${if (result.matches.size == 1) "" else "n"} con la consulta."
+                "fr" -> "Il y a ${result.matches.size} document${if (result.matches.size == 1) "" else "s"} correspondant à la recherche."
+                "de" -> "Es gibt ${result.matches.size} passende Dokumente."
+                "it" -> "Ci sono ${result.matches.size} document${if (result.matches.size == 1) "o" else "i"} corrispondenti."
+                "pt" -> "Há ${result.matches.size} documento${if (result.matches.size == 1) "" else "s"} correspondente${if (result.matches.size == 1) "" else "s"}."
+                "ca" -> "Hi ha ${result.matches.size} document${if (result.matches.size == 1) "" else "s"} que coincideix${if (result.matches.size == 1) "" else "en"} amb la consulta."
+                else -> "There are ${result.matches.size} matching documents."
+            }
+        }
+
         if (asksTotal && result.aggregateTotal != null && result.aggregateCurrency != null) {
             val formatted = "%.2f".format(Locale.US, result.aggregateTotal)
             return when (language) {
@@ -83,7 +96,18 @@ object AiLibraryAssistant {
             "ca" -> "La IA al núvol no està disponible. Resultats locals:"
             else -> "Cloud AI is unavailable. Local results:"
         }
-        return "$heading\n\n${context.take(12000)}"
+        val lines = result.matches.take(20).mapIndexed { index, match ->
+            val analysis = match.analysis
+            val title = analysis?.title?.takeIf { it.isNotBlank() } ?: match.file.nameWithoutExtension
+            val category = analysis?.category?.takeIf { it.isNotBlank() }
+            val total = analysis?.fields?.get("total")?.takeIf { it.isNotBlank() }
+            buildString {
+                append(index + 1).append(". ").append(title)
+                category?.let { append(" — ").append(it) }
+                total?.let { append(" — Total: ").append(it) }
+            }
+        }.joinToString("\n")
+        return "$heading\n\n$lines"
     }
 
     private fun noDocumentsMessage(): String = when (languageCode()) {
