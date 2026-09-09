@@ -4,9 +4,12 @@ PocketScan is an offline-first Android document scanner focused on fast capture,
 
 ## Current capabilities
 - Google ML Kit Document Scanner with automatic document capture and perspective correction
+- Local post-processing to improve contrast and readability of captured pages
 - Gallery import and multipage scanning
 - PDF and JPEG output
 - Local OCR with support for Latin, Chinese, Devanagari, Japanese and Korean text
+- OCR text export to TXT
+- Optional AI OCR correction with export of a corrected TXT copy
 - Automatic document naming and categorization
 - Local document search and folders
 - AI metadata extraction for structured document information
@@ -19,7 +22,7 @@ PocketScan is an offline-first Android document scanner focused on fast capture,
 
 ## Production work remaining
 - Firebase production configuration and API restrictions
-- Remote Config for AI model/configuration management
+- Verify and tune Remote Config values for AI model/configuration management
 - Production monitoring, quotas and budget controls
 - Final security, privacy and Google Play compliance review
 - Release signing and Play Store release testing
