@@ -81,9 +81,6 @@ class SmartScannerActivity : AppCompatActivity() {
                     }
                     val usableEnhancedPages = enhancedPages.filterNotNull()
 
-                    // The Google scanner preview has its own "Mejorar" control. After the
-                    // scanner returns, PocketScan applies a second local pass so saved PDFs
-                    // and OCR retain readable text even when the source page is washed out.
                     if (usableEnhancedPages.size == pages.size) {
                         val improvedPdf = File(dir, "document_$stamp.improved.pdf")
                         if (DocumentImageEnhancer.buildPdfFromJpegs(usableEnhancedPages, improvedPdf)) {
@@ -165,7 +162,7 @@ class SmartScannerActivity : AppCompatActivity() {
         val allText = StringBuilder()
         fun complete() {
             lifecycleScope.launch(Dispatchers.IO) {
-                runCatching { textFile.writeText(allText.toString(), Charsets.UTF_8) }
+                runCatching { textFile.writeText(allText.toString().trim() + "\n", Charsets.UTF_8) }
                 withContext(Dispatchers.Main) {
                     recognizer.close()
                     onComplete()
@@ -177,7 +174,11 @@ class SmartScannerActivity : AppCompatActivity() {
             try {
                 val image = com.google.mlkit.vision.common.InputImage.fromFilePath(this, uris[index])
                 recognizer.process(image).addOnSuccessListener { text ->
-                    if (text.text.isNotBlank()) { if (allText.isNotEmpty()) allText.append("\n\n"); allText.append(text.text) }
+                    if (text.text.isNotBlank()) {
+                        if (allText.isNotEmpty()) allText.append("\n\n")
+                        allText.append("===== PÁGINA ${index + 1} =====\n")
+                        allText.append(text.text.trim())
+                    }
                     next(index + 1)
                 }.addOnFailureListener { next(index + 1) }
             } catch (_: Exception) { next(index + 1) }
