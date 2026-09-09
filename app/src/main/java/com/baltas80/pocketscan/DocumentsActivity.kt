@@ -164,24 +164,16 @@ class DocumentsActivity : AppCompatActivity() {
     private fun suggestDocumentName(text: String, fallback: String): String {
         val lines = text.lines().map { it.trim() }.filter { it.length >= 4 }
         val keywords = listOf(
-            "factura" to "Factura",
-            "invoice" to "Factura",
-            "presupuesto" to "Presupuesto",
-            "contrato" to "Contrato",
-            "recibo" to "Recibo",
-            "ticket" to "Ticket",
-            "nómina" to "Nomina",
-            "nomina" to "Nomina",
-            "certificado" to "Certificado",
-            "informe" to "Informe",
-            "cita" to "Cita"
+            "factura" to "Factura", "invoice" to "Factura", "presupuesto" to "Presupuesto",
+            "contrato" to "Contrato", "recibo" to "Recibo", "ticket" to "Ticket",
+            "nómina" to "Nomina", "nomina" to "Nomina", "certificado" to "Certificado",
+            "informe" to "Informe", "cita" to "Cita"
         )
         val lower = text.lowercase()
         val type = keywords.firstOrNull { lower.contains(it.first) }?.second ?: fallback
         val usefulLine = lines.firstOrNull { line ->
             val normalized = line.lowercase()
-            keywords.none { normalized == it.first } &&
-                !normalized.matches(Regex("[0-9 ./:-]+"))
+            keywords.none { normalized == it.first } && !normalized.matches(Regex("[0-9 ./:-]+"))
         } ?: type
         val cleanLine = sanitizeFileName(usefulLine).take(45).trim().trim('.', '_', '-')
         val base = if (cleanLine.length >= 4) "$type - $cleanLine" else type
@@ -191,7 +183,7 @@ class DocumentsActivity : AppCompatActivity() {
     private fun sanitizeFileName(value: String): String {
         val withoutAccents = Normalizer.normalize(value, Normalizer.Form.NFD)
             .replace("\\p{InCombiningDiacriticalMarks}+".toRegex(), "")
-        return withoutAccents.replace(Regex("[^A-Za-z0-9 _()\-]"), "_")
+        return withoutAccents.replace(Regex("[-A-Za-z0-9 _()]"), "_")
             .replace(Regex("\\s+"), " ")
             .trim()
     }
