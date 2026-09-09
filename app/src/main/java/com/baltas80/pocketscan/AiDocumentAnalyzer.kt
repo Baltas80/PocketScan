@@ -4,6 +4,8 @@ import com.google.firebase.Firebase
 import com.google.firebase.ai.GenerativeModel
 import com.google.firebase.ai.ai
 import com.google.firebase.ai.type.GenerativeBackend
+import com.google.firebase.ai.type.Schema
+import com.google.firebase.ai.type.generationConfig
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import org.json.JSONObject
@@ -26,6 +28,34 @@ object AiDocumentAnalyzer {
         val source: String = "local"
     )
 
+    private val documentSchema = Schema.obj(
+        mapOf(
+            "category" to Schema.enumeration(
+                listOf("FACTURAS", "PRESUPUESTOS", "CONTRATOS", "RECIBOS", "TICKETS", "NOMINAS", "CERTIFICADOS", "INFORMES", "CITAS", "GENERAL")
+            ),
+            "title" to Schema.string(),
+            "summary" to Schema.string(),
+            "proveedor" to Schema.string(),
+            "cliente" to Schema.string(),
+            "nif_cif" to Schema.string(),
+            "numero" to Schema.string(),
+            "fecha" to Schema.string(),
+            "vencimiento" to Schema.string(),
+            "subtotal" to Schema.string(),
+            "iva" to Schema.string(),
+            "total" to Schema.string(),
+            "moneda" to Schema.string(),
+            "periodo" to Schema.string(),
+            "direccion" to Schema.string(),
+            "telefono" to Schema.string(),
+            "concepto" to Schema.string()
+        ),
+        optionalProperties = listOf(
+            "proveedor", "cliente", "nif_cif", "numero", "fecha", "vencimiento",
+            "subtotal", "iva", "total", "moneda", "periodo", "direccion", "telefono", "concepto"
+        )
+    )
+
     suspend fun analyze(file: File, ocrText: String = ""): Result<Analysis> = withContext(Dispatchers.IO) {
         runCatching {
             require(file.isFile) { "Document not found" }
@@ -36,7 +66,13 @@ object AiDocumentAnalyzer {
 
     private suspend fun tryCloudAnalysis(file: File, ocrText: String): Result<Analysis> = runCatching {
         val model: GenerativeModel = Firebase.ai(backend = GenerativeBackend.googleAI())
-            .generativeModel("gemini-3.8-flash")
+            .generativeModel(
+                modelName = "gemini-3.8-flash",
+                generationConfig = generationConfig {
+                    responseMimeType = "application/json"
+                    responseSchema = documentSchema
+                }
+            )
 
         val auxiliaryOcr = ocrText.take(12000)
         val prompt = content {
@@ -44,11 +80,10 @@ object AiDocumentAnalyzer {
             text(
                 """
                 You are PocketScan's document intelligence engine. Analyze the complete PDF, including layout, tables and visible values. OCR text below is only auxiliary context.
-                Return ONLY valid JSON. Never invent data. If a value is absent, use an empty string.
-                Category must be one of: FACTURAS, PRESUPUESTOS, CONTRATOS, RECIBOS, TICKETS, NOMINAS, CERTIFICADOS, INFORMES, CITAS or GENERAL.
-                Extract only data actually present. Useful fields: proveedor, cliente, nif_cif, numero, fecha, vencimiento, subtotal, iva, total, moneda, periodo, direccion, telefono and other relevant fields.
-                Keep the category code exactly as listed. Write title and summary in ${languageName()}.
-                Exact format: {"category":"...","title":"...","summary":"...","fields":{"clave":"valor"}}
+                Return the requested JSON schema. Never invent data. For absent fields, leave them empty.
+                Extract only data actually present in the document. Preserve exact amounts, dates, identifiers and names when readable.
+                Category must be the closest allowed category. Write title and summary in ${languageName()}.
+                For monetary values, preserve the document's displayed decimal separator and currency when possible.
 
                 AUXILIARY OCR:
                 $auxiliaryOcr
@@ -57,13 +92,13 @@ object AiDocumentAnalyzer {
         }
 
         val response = model.generateContent(prompt)
-        val json = JSONObject(extractJson(response.text ?: error("AI returned no content")))
-        val fieldsJson = json.optJSONObject("fields")
+        val json = JSONObject(response.text ?: error("AI returned no content"))
         val fields = linkedMapOf<String, String>()
-        if (fieldsJson != null) {
-            fieldsJson.keys().forEach { key ->
-                fieldsJson.optString(key).trim().takeIf { it.isNotEmpty() }?.let { fields[key] = it }
-            }
+        listOf(
+            "proveedor", "cliente", "nif_cif", "numero", "fecha", "vencimiento",
+            "subtotal", "iva", "total", "moneda", "periodo", "direccion", "telefono", "concepto"
+        ).forEach { key ->
+            json.optString(key).trim().takeIf { it.isNotEmpty() }?.let { fields[key] = it }
         }
         Analysis(
             normalizeCategory(json.optString("category")),
@@ -115,14 +150,6 @@ object AiDocumentAnalyzer {
         .replace(Regex("\\s+"), " ")
         .replace(Regex("[\\r\\n]+"), " ")
         .trim()
-
-    private fun extractJson(raw: String): String {
-        val cleaned = raw.substringAfter("```json", raw).substringBeforeLast("```").trim()
-        val start = cleaned.indexOf('{')
-        val end = cleaned.lastIndexOf('}')
-        require(start >= 0 && end > start) { "Invalid AI response" }
-        return cleaned.substring(start, end + 1)
-    }
 
     private fun languageName(): String = when (Locale.getDefault().language.lowercase(Locale.ROOT)) {
         "es" -> "Spanish"
