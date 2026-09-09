@@ -74,15 +74,11 @@ class DocumentsActivity : AppCompatActivity() {
         lifecycleScope.launch {
             val found = withContext(Dispatchers.IO) {
                 scansDir.mkdirs()
-                scansDir.walkTopDown()
-                    .filter { it.isFile && it.extension.equals("pdf", true) }
-                    .sortedByDescending { it.lastModified() }
-                    .toList()
+                scansDir.walkTopDown().filter { it.isFile && it.extension.equals("pdf", true) }
+                    .sortedByDescending { it.lastModified() }.toList()
             }
             if (isFinishing || isDestroyed) return@launch
-            allDocuments.clear()
-            allDocuments.addAll(found)
-            applyFilters()
+            allDocuments.clear(); allDocuments.addAll(found); applyFilters()
         }
     }
 
@@ -102,21 +98,12 @@ class DocumentsActivity : AppCompatActivity() {
                 }
             }
             if (isFinishing || isDestroyed) return@launch
-            documents.clear()
-            documents.addAll(filtered)
-            adapter.notifyDataSetChanged()
+            documents.clear(); documents.addAll(filtered); adapter.notifyDataSetChanged()
         }
     }
 
     private fun openDocument(file: File) {
-        val uri = FileProvider.getUriForFile(this, "${packageName}.fileprovider", file)
-        val intent = Intent(Intent.ACTION_VIEW).apply {
-            setDataAndType(uri, "application/pdf")
-            addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
-        }
-        try { startActivity(intent) } catch (_: Exception) {
-            Toast.makeText(this, "No hay una aplicación para abrir PDF", Toast.LENGTH_SHORT).show()
-        }
+        startActivity(Intent(this, PdfViewerActivity::class.java).putExtra(PdfViewerActivity.EXTRA_PATH, file.absolutePath))
     }
 
     private fun shareDocument(file: File) {
@@ -133,16 +120,13 @@ class DocumentsActivity : AppCompatActivity() {
         lifecycleScope.launch {
             val result = withContext(Dispatchers.IO) { prepareImportedImages(uris) }
             if (result == null) {
-                Toast.makeText(this@DocumentsActivity, "No se pudo importar", Toast.LENGTH_LONG).show()
-                return@launch
+                Toast.makeText(this@DocumentsActivity, "No se pudo importar", Toast.LENGTH_LONG).show(); return@launch
             }
             val (tempFiles, pdf, text) = result
             createPdfFromImagesAsync(tempFiles, pdf) { pdfCreated ->
                 if (!pdfCreated) {
-                    tempFiles.forEach { it.delete() }
-                    pdf.delete(); text.delete()
-                    Toast.makeText(this@DocumentsActivity, "No se pudo crear el PDF", Toast.LENGTH_LONG).show()
-                    return@createPdfFromImagesAsync
+                    tempFiles.forEach { it.delete() }; pdf.delete(); text.delete()
+                    Toast.makeText(this@DocumentsActivity, "No se pudo crear el PDF", Toast.LENGTH_LONG).show(); return@createPdfFromImagesAsync
                 }
                 runOcr(tempFiles, text) {
                     lifecycleScope.launch {
@@ -176,24 +160,18 @@ class DocumentsActivity : AppCompatActivity() {
         return try {
             uris.forEachIndexed { index, uri ->
                 val temp = File(scansDir, "import_${stamp}_$index.jpg")
-                contentResolver.openInputStream(uri)?.use { input ->
-                    FileOutputStream(temp).use { output -> input.copyTo(output) }
-                } ?: error("No se pudo leer una imagen")
+                contentResolver.openInputStream(uri)?.use { input -> FileOutputStream(temp).use { output -> input.copyTo(output) } } ?: error("No se pudo leer una imagen")
                 tempFiles.add(temp)
             }
             ImportFiles(tempFiles, pdf, text)
         } catch (_: Exception) {
-            tempFiles.forEach { it.delete() }
-            pdf.delete(); text.delete()
-            null
+            tempFiles.forEach { it.delete() }; pdf.delete(); text.delete(); null
         }
     }
 
     private fun createPdfFromImagesAsync(files: List<File>, pdfFile: File, onComplete: (Boolean) -> Unit) {
         lifecycleScope.launch {
-            val success = withContext(Dispatchers.Default) {
-                runCatching { createPdfFromImages(files, pdfFile) }.isSuccess
-            }
+            val success = withContext(Dispatchers.Default) { runCatching { createPdfFromImages(files, pdfFile) }.isSuccess }
             onComplete(success)
         }
     }
@@ -206,30 +184,22 @@ class DocumentsActivity : AppCompatActivity() {
                 val page = document.startPage(PdfDocument.PageInfo.Builder(595, 842, index + 1).create())
                 val margin = 24f
                 val scale = minOf((595f - margin * 2) / bitmap.width, (842f - margin * 2) / bitmap.height)
-                val width = bitmap.width * scale
-                val height = bitmap.height * scale
-                val left = (595f - width) / 2f
-                val top = (842f - height) / 2f
+                val width = bitmap.width * scale; val height = bitmap.height * scale
+                val left = (595f - width) / 2f; val top = (842f - height) / 2f
                 page.canvas.drawBitmap(bitmap, null, RectF(left, top, left + width, top + height), null)
-                document.finishPage(page)
-                bitmap.recycle()
+                document.finishPage(page); bitmap.recycle()
             }
             FileOutputStream(pdfFile).use { document.writeTo(it) }
         } finally { document.close() }
     }
 
     private fun runOcr(files: List<File>, textFile: File, onComplete: () -> Unit) {
-        val recognizer = com.google.mlkit.vision.text.TextRecognition.getClient(
-            com.google.mlkit.vision.text.latin.TextRecognizerOptions.DEFAULT_OPTIONS
-        )
+        val recognizer = com.google.mlkit.vision.text.TextRecognition.getClient(com.google.mlkit.vision.text.latin.TextRecognizerOptions.DEFAULT_OPTIONS)
         val all = StringBuilder()
         fun complete() {
             lifecycleScope.launch(Dispatchers.IO) {
                 runCatching { textFile.writeText(all.toString(), Charsets.UTF_8) }
-                withContext(Dispatchers.Main) {
-                    recognizer.close()
-                    onComplete()
-                }
+                withContext(Dispatchers.Main) { recognizer.close(); onComplete() }
             }
         }
         fun next(index: Int) {
@@ -237,10 +207,7 @@ class DocumentsActivity : AppCompatActivity() {
             try {
                 val image = com.google.mlkit.vision.common.InputImage.fromFilePath(this, Uri.fromFile(files[index]))
                 recognizer.process(image).addOnSuccessListener { result ->
-                    if (result.text.isNotBlank()) {
-                        if (all.isNotEmpty()) all.append("\n\n")
-                        all.append(result.text)
-                    }
+                    if (result.text.isNotBlank()) { if (all.isNotEmpty()) all.append("\n\n"); all.append(result.text) }
                     next(index + 1)
                 }.addOnFailureListener { next(index + 1) }
             } catch (_: Exception) { next(index + 1) }
@@ -253,10 +220,7 @@ class DocumentsActivity : AppCompatActivity() {
         val candidate = suggestDocumentName(ocrText, fallback)
         var target = File(dir, "$candidate.pdf")
         var counter = 2
-        while (target.exists() && target.absolutePath != pdf.absolutePath) {
-            target = File(dir, "$candidate ($counter).pdf")
-            counter++
-        }
+        while (target.exists() && target.absolutePath != pdf.absolutePath) { target = File(dir, "$candidate ($counter).pdf"); counter++ }
         if (target.absolutePath == pdf.absolutePath || !pdf.renameTo(target)) return pdf
         return target
     }
@@ -275,18 +239,14 @@ class DocumentsActivity : AppCompatActivity() {
             DocumentOrganizer.CITAS -> "Cita"
             else -> fallback
         }
-        val usefulLine = lines.firstOrNull { line ->
-            !line.lowercase().contains(type.lowercase()) && !line.lowercase().matches(Regex("[0-9 ./:-]+"))
-        }
+        val usefulLine = lines.firstOrNull { line -> !line.lowercase().contains(type.lowercase()) && !line.lowercase().matches(Regex("[0-9 ./:-]+")) }
         val cleanLine = sanitizeFileName(usefulLine ?: type).take(45).trim().trim('.', '_', '-')
         return sanitizeFileName(if (cleanLine.length >= 4) "$type - $cleanLine" else type).take(80).trim().ifEmpty { "Documento" }
     }
 
     private fun sanitizeFileName(value: String): String {
-        val withoutAccents = Normalizer.normalize(value, Normalizer.Form.NFD)
-            .replace("\\p{InCombiningDiacriticalMarks}+".toRegex(), "")
-        return withoutAccents.replace(Regex("[^A-Za-z0-9 _()-]"), "_")
-            .replace(Regex("\\s+"), " ").trim()
+        val withoutAccents = Normalizer.normalize(value, Normalizer.Form.NFD).replace("\\p{InCombiningDiacriticalMarks}+".toRegex(), "")
+        return withoutAccents.replace(Regex("[^A-Za-z0-9 _()-]"), "_").replace(Regex("\\s+"), " ").trim()
     }
 
     private fun renameDocument(file: File) {
@@ -297,21 +257,14 @@ class DocumentsActivity : AppCompatActivity() {
                 val newName = sanitizeFileName(input.text.toString().trim())
                 if (newName.isEmpty()) return@setPositiveButton
                 val target = File(file.parentFile, "$newName.pdf")
-                if (target.exists()) {
-                    Toast.makeText(this, R.string.file_already_exists, Toast.LENGTH_SHORT).show()
-                    return@setPositiveButton
-                }
+                if (target.exists()) { Toast.makeText(this, R.string.file_already_exists, Toast.LENGTH_SHORT).show(); return@setPositiveButton }
                 lifecycleScope.launch {
                     val success = withContext(Dispatchers.IO) {
-                        if (!file.renameTo(target)) false
-                        else {
-                            File(file.parentFile, file.nameWithoutExtension + ".txt")
-                                .renameTo(File(file.parentFile, "$newName.txt"))
-                            true
+                        if (!file.renameTo(target)) false else {
+                            File(file.parentFile, file.nameWithoutExtension + ".txt").renameTo(File(file.parentFile, "$newName.txt")); true
                         }
                     }
-                    if (success) loadDocuments()
-                    else Toast.makeText(this@DocumentsActivity, R.string.rename_failed, Toast.LENGTH_SHORT).show()
+                    if (success) loadDocuments() else Toast.makeText(this@DocumentsActivity, R.string.rename_failed, Toast.LENGTH_SHORT).show()
                 }
             }.show()
     }
@@ -322,12 +275,9 @@ class DocumentsActivity : AppCompatActivity() {
             .setPositiveButton(R.string.delete) { _, _ ->
                 lifecycleScope.launch {
                     val deleted = withContext(Dispatchers.IO) {
-                        val result = file.delete()
-                        File(file.parentFile, file.nameWithoutExtension + ".txt").delete()
-                        result
+                        val result = file.delete(); File(file.parentFile, file.nameWithoutExtension + ".txt").delete(); result
                     }
-                    if (deleted) loadDocuments()
-                    else Toast.makeText(this@DocumentsActivity, R.string.delete_failed, Toast.LENGTH_SHORT).show()
+                    if (deleted) loadDocuments() else Toast.makeText(this@DocumentsActivity, R.string.delete_failed, Toast.LENGTH_SHORT).show()
                 }
             }.show()
     }
