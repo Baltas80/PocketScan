@@ -39,7 +39,7 @@ class DocumentsActivity : AppCompatActivity() {
         recyclerView = findViewById(R.id.documentsRecycler)
         searchInput = findViewById(R.id.searchInput)
         categorySpinner = findViewById(R.id.categorySpinner)
-        adapter = DocumentAdapter(documents, ::openDocument, ::shareDocument, ::renameDocument, ::deleteDocument)
+        adapter = DocumentAdapter(documents, scansDir, ::openDocument, ::shareDocument, ::renameDocument, ::deleteDocument)
         recyclerView.layoutManager = LinearLayoutManager(this)
         recyclerView.adapter = adapter
 
@@ -66,9 +66,7 @@ class DocumentsActivity : AppCompatActivity() {
     private fun loadDocuments() {
         scansDir.mkdirs()
         allDocuments.clear()
-        allDocuments.addAll(scansDir.walkTopDown()
-            .filter { it.isFile && it.extension.equals("pdf", true) }
-            .sortedByDescending { it.lastModified() })
+        allDocuments.addAll(scansDir.walkTopDown().filter { it.isFile && it.extension.equals("pdf", true) }.sortedByDescending { it.lastModified() })
         applyFilters()
     }
 
@@ -78,12 +76,9 @@ class DocumentsActivity : AppCompatActivity() {
         documents.clear()
         documents.addAll(allDocuments.filter { file ->
             val category = DocumentOrganizer.categoryForFile(file, scansDir)
-            val categoryOk = selected == "Todas" || category == selected
-            if (!categoryOk) return@filter false
+            if (selected != "Todas" && category != selected) return@filter false
             if (query.isEmpty()) return@filter true
-            file.nameWithoutExtension.lowercase().contains(query) ||
-                File(file.parentFile, file.nameWithoutExtension + ".txt").takeIf { it.exists() }
-                    ?.readText(Charsets.UTF_8)?.lowercase()?.contains(query) == true
+            file.nameWithoutExtension.lowercase().contains(query) || File(file.parentFile, file.nameWithoutExtension + ".txt").takeIf { it.exists() }?.readText(Charsets.UTF_8)?.lowercase()?.contains(query) == true
         })
         adapter.notifyDataSetChanged()
     }
@@ -109,19 +104,17 @@ class DocumentsActivity : AppCompatActivity() {
         try {
             uris.forEachIndexed { index, uri ->
                 val temp = File(scansDir, "import_${stamp}_$index.jpg")
-                contentResolver.openInputStream(uri)?.use { input -> FileOutputStream(temp).use { output -> input.copyTo(output) } }
-                    ?: error("No se pudo leer una imagen")
+                contentResolver.openInputStream(uri)?.use { input -> FileOutputStream(temp).use { output -> input.copyTo(output) } } ?: error("No se pudo leer una imagen")
                 tempFiles.add(temp)
             }
             createPdfFromImages(tempFiles, pdf)
             runOcr(tempFiles, text) {
                 tempFiles.forEach { it.delete() }
                 val renamedPdf = autoNameDocument(pdf, text.readText(Charsets.UTF_8), "Documento importado")
-                val finalPdf = renamedPdf
-                val finalText = File(finalPdf.parentFile, finalPdf.nameWithoutExtension + ".txt")
+                val finalText = File(renamedPdf.parentFile, renamedPdf.nameWithoutExtension + ".txt")
                 if (text.exists() && text.absolutePath != finalText.absolutePath) text.renameTo(finalText)
                 val category = DocumentOrganizer.categoryForText(finalText.takeIf { it.exists() }?.readText(Charsets.UTF_8).orEmpty())
-                DocumentOrganizer.moveDocument(finalPdf, finalText, scansDir, category)
+                DocumentOrganizer.moveDocument(renamedPdf, finalText, scansDir, category)
                 loadDocuments()
                 Toast.makeText(this, "Documento importado en $category", Toast.LENGTH_SHORT).show()
             }
@@ -177,7 +170,6 @@ class DocumentsActivity : AppCompatActivity() {
 
     private fun suggestDocumentName(text: String, fallback: String): String {
         val lines = text.lines().map { it.trim() }.filter { it.length >= 4 }
-        val lower = text.lowercase()
         val type = when (DocumentOrganizer.categoryForText(text)) {
             DocumentOrganizer.FACTURAS -> "Factura"
             DocumentOrganizer.PRESUPUESTOS -> "Presupuesto"
@@ -192,8 +184,7 @@ class DocumentsActivity : AppCompatActivity() {
         }
         val usefulLine = lines.firstOrNull { line -> !line.lowercase().contains(type.lowercase()) && !line.lowercase().matches(Regex("[0-9 ./:-]+")) }
         val cleanLine = sanitizeFileName(usefulLine ?: type).take(45).trim().trim('.', '_', '-')
-        val base = if (cleanLine.length >= 4 && !lower.trim().equals(cleanLine.lowercase())) "$type - $cleanLine" else type
-        return sanitizeFileName(base).take(80).trim().ifEmpty { "Documento" }
+        return sanitizeFileName(if (cleanLine.length >= 4) "$type - $cleanLine" else type).take(80).trim().ifEmpty { "Documento" }
     }
 
     private fun sanitizeFileName(value: String): String {
