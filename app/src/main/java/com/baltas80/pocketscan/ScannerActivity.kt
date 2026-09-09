@@ -56,7 +56,6 @@ class ScannerActivity : AppCompatActivity() {
         findViewById<Button>(R.id.captureButton).setOnClickListener { takePage() }
         findViewById<Button>(R.id.removeButton).setOnClickListener { removeLastPage() }
         findViewById<Button>(R.id.finishButton).setOnClickListener { finishPdf() }
-
         if (ContextCompat.checkSelfPermission(this, Manifest.permission.CAMERA) == PackageManager.PERMISSION_GRANTED) startCamera()
         else permissionLauncher.launch(Manifest.permission.CAMERA)
     }
@@ -66,9 +65,7 @@ class ScannerActivity : AppCompatActivity() {
         future.addListener({
             val provider = future.get()
             val preview = Preview.Builder().build().also { it.surfaceProvider = previewView.surfaceProvider }
-            imageCapture = ImageCapture.Builder()
-                .setCaptureMode(ImageCapture.CAPTURE_MODE_MINIMIZE_LATENCY)
-                .build()
+            imageCapture = ImageCapture.Builder().setCaptureMode(ImageCapture.CAPTURE_MODE_MINIMIZE_LATENCY).build()
             try {
                 provider.unbindAll()
                 provider.bindToLifecycle(this, CameraSelector.DEFAULT_BACK_CAMERA, preview, imageCapture)
@@ -93,11 +90,8 @@ class ScannerActivity : AppCompatActivity() {
                     busy = false
                     Toast.makeText(this@ScannerActivity, exception.message ?: "Capture failed", Toast.LENGTH_LONG).show()
                 }
-
                 override fun onImageSaved(outputFileResults: ImageCapture.OutputFileResults) {
-                    capturedPages.add(photo)
-                    busy = false
-                    updatePageStatus()
+                    capturedPages.add(photo); busy = false; updatePageStatus()
                 }
             }
         )
@@ -105,16 +99,12 @@ class ScannerActivity : AppCompatActivity() {
 
     private fun removeLastPage() {
         if (busy || capturedPages.isEmpty()) return
-        capturedPages.removeLast().delete()
-        updatePageStatus()
+        capturedPages.removeLast().delete(); updatePageStatus()
     }
 
     private fun updatePageStatus() {
-        hint.text = if (capturedPages.isEmpty()) {
-            "Alinea el documento dentro del encuadre"
-        } else {
+        hint.text = if (capturedPages.isEmpty()) "Alinea el documento dentro del encuadre" else
             "${capturedPages.size} página(s) preparada(s). Puedes añadir otra, eliminar la última o finalizar."
-        }
         findViewById<Button>(R.id.removeButton).isEnabled = capturedPages.isNotEmpty() && !busy
         findViewById<Button>(R.id.finishButton).isEnabled = capturedPages.isNotEmpty() && !busy
     }
@@ -124,16 +114,12 @@ class ScannerActivity : AppCompatActivity() {
             if (capturedPages.isEmpty()) Toast.makeText(this, "Captura al menos una página", Toast.LENGTH_SHORT).show()
             return
         }
-
-        busy = true
-        updatePageStatus()
-        hint.text = "Procesando documento…"
+        busy = true; updatePageStatus(); hint.text = "Procesando documento…"
         val pages = capturedPages.toList()
         val dir = File(filesDir, "scans")
         val stamp = SimpleDateFormat("yyyyMMdd_HHmmss", Locale.US).format(Date())
         val pdf = File(dir, "document_$stamp.pdf")
         val text = File(dir, "document_$stamp.txt")
-
         try {
             createPdf(pages, pdf)
             runOcr(pages, text) { ocrText ->
@@ -145,8 +131,7 @@ class ScannerActivity : AppCompatActivity() {
                 finish()
             }
         } catch (e: Exception) {
-            busy = false
-            updatePageStatus()
+            busy = false; updatePageStatus()
             Toast.makeText(this, e.message ?: "No se pudo crear el PDF", Toast.LENGTH_LONG).show()
         }
     }
@@ -154,38 +139,20 @@ class ScannerActivity : AppCompatActivity() {
     private fun runOcr(files: List<File>, textFile: File, onComplete: (String) -> Unit) {
         val recognizer = TextRecognition.getClient(TextRecognizerOptions.DEFAULT_OPTIONS)
         val all = StringBuilder()
-
         fun complete() {
-            try {
-                val result = all.toString()
-                textFile.writeText(result, Charsets.UTF_8)
-                onComplete(result)
-            } finally {
-                recognizer.close()
-            }
+            try { val result = all.toString(); textFile.writeText(result, Charsets.UTF_8); onComplete(result) }
+            finally { recognizer.close() }
         }
-
         fun next(index: Int) {
-            if (index >= files.size) {
-                complete()
-                return
-            }
+            if (index >= files.size) { complete(); return }
             try {
                 val image = InputImage.fromFilePath(this, Uri.fromFile(files[index]))
-                recognizer.process(image)
-                    .addOnSuccessListener { result ->
-                        if (result.text.isNotBlank()) {
-                            if (all.isNotEmpty()) all.append("\n\n")
-                            all.append(result.text)
-                        }
-                        next(index + 1)
-                    }
-                    .addOnFailureListener { next(index + 1) }
-            } catch (_: Exception) {
-                next(index + 1)
-            }
+                recognizer.process(image).addOnSuccessListener { result ->
+                    if (result.text.isNotBlank()) { if (all.isNotEmpty()) all.append("\n\n"); all.append(result.text) }
+                    next(index + 1)
+                }.addOnFailureListener { next(index + 1) }
+            } catch (_: Exception) { next(index + 1) }
         }
-
         next(0)
     }
 
@@ -199,28 +166,19 @@ class ScannerActivity : AppCompatActivity() {
             "nómina" to "Nomina", "nomina" to "Nomina", "certificado" to "Certificado",
             "informe" to "Informe", "cita" to "Cita"
         ).firstOrNull { lower.contains(it.first) }?.second ?: fallback
-        val usefulLine = lines.firstOrNull { line ->
-            val value = line.lowercase()
-            !value.matches(Regex("[0-9 ./:-]+")) && value.length >= 4
-        } ?: type
+        val usefulLine = lines.firstOrNull { line -> line.length >= 4 && !line.lowercase().matches(Regex("[0-9 ./:-]+")) } ?: type
         val cleanLine = sanitizeFileName(usefulLine).take(45).trim().trim('.', '_', '-')
-        val base = sanitizeFileName(if (cleanLine.length >= 4) "$type - $cleanLine" else type)
-            .take(80).trim().ifEmpty { "Documento" }
+        val base = sanitizeFileName(if (cleanLine.length >= 4) "$type - $cleanLine" else type).take(80).trim().ifEmpty { "Documento" }
         var target = File(dir, "$base.pdf")
         var counter = 2
-        while (target.exists() && target.absolutePath != pdf.absolutePath) {
-            target = File(dir, "$base ($counter).pdf")
-            counter++
-        }
+        while (target.exists() && target.absolutePath != pdf.absolutePath) { target = File(dir, "$base ($counter).pdf"); counter++ }
         if (target.absolutePath == pdf.absolutePath || !pdf.renameTo(target)) return pdf
         return target
     }
 
     private fun sanitizeFileName(value: String): String {
-        val withoutAccents = Normalizer.normalize(value, Normalizer.Form.NFD)
-            .replace("\\p{InCombiningDiacriticalMarks}+".toRegex(), "")
-        return withoutAccents.replace(Regex("[^A-Za-z0-9 _()\-]"), "_")
-            .replace(Regex("\\s+"), " ").trim()
+        val withoutAccents = Normalizer.normalize(value, Normalizer.Form.NFD).replace("\\p{InCombiningDiacriticalMarks}+".toRegex(), "")
+        return withoutAccents.replace(Regex("[^A-Za-z0-9 _()-]"), "_").replace(Regex("\\s+"), " ").trim()
     }
 
     private fun createPdf(files: List<File>, pdfFile: File) {
@@ -230,14 +188,11 @@ class ScannerActivity : AppCompatActivity() {
                 val source = BitmapFactory.decodeFile(file.absolutePath) ?: error("No se pudo leer la imagen")
                 val rotated = applyExifRotation(file, source)
                 val enhanced = enhanceDocument(rotated)
-                val pageInfo = PdfDocument.PageInfo.Builder(595, 842, index + 1).create()
-                val page = document.startPage(pageInfo)
+                val page = document.startPage(PdfDocument.PageInfo.Builder(595, 842, index + 1).create())
                 val margin = 24f
                 val scale = minOf((595f - margin * 2) / enhanced.width, (842f - margin * 2) / enhanced.height)
-                val width = enhanced.width * scale
-                val height = enhanced.height * scale
-                val left = (595f - width) / 2f
-                val top = (842f - height) / 2f
+                val width = enhanced.width * scale; val height = enhanced.height * scale
+                val left = (595f - width) / 2f; val top = (842f - height) / 2f
                 page.canvas.drawBitmap(enhanced, null, android.graphics.RectF(left, top, left + width, top + height), Paint(Paint.ANTI_ALIAS_FLAG or Paint.FILTER_BITMAP_FLAG))
                 document.finishPage(page)
                 if (enhanced !== rotated) enhanced.recycle()
@@ -252,8 +207,7 @@ class ScannerActivity : AppCompatActivity() {
         val output = input.copy(Bitmap.Config.ARGB_8888, true)
         val pixels = IntArray(output.width * output.height)
         output.getPixels(pixels, 0, output.width, 0, 0, output.width, output.height)
-        val contrast = 1.18f
-        val brightness = 2f
+        val contrast = 1.18f; val brightness = 2f
         for (i in pixels.indices) {
             val c = pixels[i]
             val r = ((android.graphics.Color.red(c) - 128) * contrast + 128 + brightness).toInt()
