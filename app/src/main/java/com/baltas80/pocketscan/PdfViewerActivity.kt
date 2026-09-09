@@ -129,6 +129,7 @@ class PdfViewerActivity : AppCompatActivity() {
             val success = runCatching {
                 contentResolver.openOutputStream(uri)?.use { output ->
                     output.write(pendingText.toByteArray(Charsets.UTF_8))
+                    true
                 } ?: false
             }.getOrDefault(false)
             withContext(Dispatchers.Main) {
