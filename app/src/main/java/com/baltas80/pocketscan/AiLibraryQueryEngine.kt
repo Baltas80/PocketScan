@@ -120,12 +120,33 @@ object AiLibraryQueryEngine {
 
     private fun parseAmountFilter(query: String): AmountFilter? {
         val number = "([0-9]{1,3}(?:\\.[0-9]{3})*(?:,[0-9]{1,2})?|[0-9]+(?:[.,][0-9]{1,2})?)"
-        val regex = Regex("\\b(mayor|superior|más de|mas de|greater than|over|above|menor|inferior|menos de|less than|under|below|igual a|exactamente)\\s+$number\\b")
-        val match = regex.find(query) ?: return null
-        val amount = parseNumber(match.groupValues[2]) ?: return null
-        val mode = when (match.groupValues[1]) {
-            "mayor", "superior", "más de", "mas de", "greater than", "over", "above" -> AmountFilter.Mode.GT
-            "menor", "inferior", "menos de", "less than", "under", "below" -> AmountFilter.Mode.LT
+        val phraseRegex = Regex(
+            "\\b(al menos|como mínimo|como minimo|at least|mayor o igual que|greater than or equal to|" +
+                "más de|mas de|mayor que|mayor|superior|greater than|over|above|" +
+                "como máximo|como maximo|at most|menor o igual que|less than or equal to|" +
+                "menos de|menor que|menor|inferior|less than|under|below|" +
+                "igual a|exactamente)\\s+$number\\b"
+        )
+        val phrase = phraseRegex.find(query)
+        if (phrase != null) {
+            val amount = parseNumber(phrase.groupValues[2]) ?: return null
+            val mode = when (phrase.groupValues[1]) {
+                "al menos", "como mínimo", "como minimo", "at least", "mayor o igual que", "greater than or equal to" -> AmountFilter.Mode.GTE
+                "más de", "mas de", "mayor que", "mayor", "superior", "greater than", "over", "above" -> AmountFilter.Mode.GT
+                "como máximo", "como maximo", "at most", "menor o igual que", "less than or equal to" -> AmountFilter.Mode.LTE
+                "menos de", "menor que", "menor", "inferior", "less than", "under", "below" -> AmountFilter.Mode.LT
+                else -> AmountFilter.Mode.EQ
+            }
+            return AmountFilter(mode, amount)
+        }
+
+        val symbol = Regex("(?:total\\s*)?(>=|<=|>|<|=)\\s*$number\\b").find(query) ?: return null
+        val amount = parseNumber(symbol.groupValues[2]) ?: return null
+        val mode = when (symbol.groupValues[1]) {
+            ">" -> AmountFilter.Mode.GT
+            ">=" -> AmountFilter.Mode.GTE
+            "<" -> AmountFilter.Mode.LT
+            "<=" -> AmountFilter.Mode.LTE
             else -> AmountFilter.Mode.EQ
         }
         return AmountFilter(mode, amount)
