@@ -69,21 +69,13 @@ class DocumentsActivity : AppCompatActivity() {
 
     private fun openDocument(file: File) {
         val uri = FileProvider.getUriForFile(this, "${packageName}.fileprovider", file)
-        val intent = Intent(Intent.ACTION_VIEW).apply {
-            setDataAndType(uri, "application/pdf")
-            addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
-        }
-        try { startActivity(intent) }
-        catch (_: Exception) { Toast.makeText(this, "No hay una aplicación para abrir PDF", Toast.LENGTH_SHORT).show() }
+        val intent = Intent(Intent.ACTION_VIEW).apply { setDataAndType(uri, "application/pdf"); addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION) }
+        try { startActivity(intent) } catch (_: Exception) { Toast.makeText(this, "No hay una aplicación para abrir PDF", Toast.LENGTH_SHORT).show() }
     }
 
     private fun shareDocument(file: File) {
         val uri = FileProvider.getUriForFile(this, "${packageName}.fileprovider", file)
-        val intent = Intent(Intent.ACTION_SEND).apply {
-            type = "application/pdf"
-            putExtra(Intent.EXTRA_STREAM, uri)
-            addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
-        }
+        val intent = Intent(Intent.ACTION_SEND).apply { type = "application/pdf"; putExtra(Intent.EXTRA_STREAM, uri); addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION) }
         startActivity(Intent.createChooser(intent, getString(R.string.share_document)))
     }
 
@@ -96,8 +88,7 @@ class DocumentsActivity : AppCompatActivity() {
         try {
             uris.forEachIndexed { index, uri ->
                 val temp = File(dir, "import_${stamp}_$index.jpg")
-                contentResolver.openInputStream(uri)?.use { input -> FileOutputStream(temp).use { output -> input.copyTo(output) } }
-                    ?: error("No se pudo leer una imagen")
+                contentResolver.openInputStream(uri)?.use { input -> FileOutputStream(temp).use { output -> input.copyTo(output) } } ?: error("No se pudo leer una imagen")
                 tempFiles.add(temp)
             }
             createPdfFromImages(tempFiles, pdf)
@@ -153,63 +144,45 @@ class DocumentsActivity : AppCompatActivity() {
         val candidate = suggestDocumentName(ocrText, fallback)
         var target = File(dir, "$candidate.pdf")
         var counter = 2
-        while (target.exists() && target.absolutePath != pdf.absolutePath) {
-            target = File(dir, "$candidate ($counter).pdf")
-            counter++
-        }
+        while (target.exists() && target.absolutePath != pdf.absolutePath) { target = File(dir, "$candidate ($counter).pdf"); counter++ }
         if (target.absolutePath == pdf.absolutePath || !pdf.renameTo(target)) return pdf
         return target
     }
 
     private fun suggestDocumentName(text: String, fallback: String): String {
         val lines = text.lines().map { it.trim() }.filter { it.length >= 4 }
-        val keywords = listOf(
-            "factura" to "Factura", "invoice" to "Factura", "presupuesto" to "Presupuesto",
-            "contrato" to "Contrato", "recibo" to "Recibo", "ticket" to "Ticket",
-            "nómina" to "Nomina", "nomina" to "Nomina", "certificado" to "Certificado",
-            "informe" to "Informe", "cita" to "Cita"
-        )
+        val keywords = listOf("factura" to "Factura", "invoice" to "Factura", "presupuesto" to "Presupuesto", "contrato" to "Contrato", "recibo" to "Recibo", "ticket" to "Ticket", "nómina" to "Nomina", "nomina" to "Nomina", "certificado" to "Certificado", "informe" to "Informe", "cita" to "Cita")
         val lower = text.lowercase()
         val type = keywords.firstOrNull { lower.contains(it.first) }?.second ?: fallback
-        val usefulLine = lines.firstOrNull { line ->
-            val normalized = line.lowercase()
-            keywords.none { normalized == it.first } && !normalized.matches(Regex("[0-9 ./:-]+"))
-        } ?: type
+        val usefulLine = lines.firstOrNull { line -> keywords.none { line.lowercase() == it.first } && !line.lowercase().matches(Regex("[0-9 ./:-]+")) } ?: type
         val cleanLine = sanitizeFileName(usefulLine).take(45).trim().trim('.', '_', '-')
         val base = if (cleanLine.length >= 4) "$type - $cleanLine" else type
         return sanitizeFileName(base).take(80).trim().ifEmpty { "Documento" }
     }
 
     private fun sanitizeFileName(value: String): String {
-        val withoutAccents = Normalizer.normalize(value, Normalizer.Form.NFD)
-            .replace("\\p{InCombiningDiacriticalMarks}+".toRegex(), "")
-        return withoutAccents.replace(Regex("[-A-Za-z0-9 _()]"), "_")
-            .replace(Regex("\\s+"), " ")
-            .trim()
+        val withoutAccents = Normalizer.normalize(value, Normalizer.Form.NFD).replace("\\p{InCombiningDiacriticalMarks}+".toRegex(), "")
+        return withoutAccents.replace(Regex("[^A-Za-z0-9 _()-]"), "_").replace(Regex("\\s+"), " ").trim()
     }
 
     private fun renameDocument(file: File) {
         val input = EditText(this).apply { setText(file.nameWithoutExtension); selectAll() }
-        AlertDialog.Builder(this).setTitle(R.string.rename_document).setView(input)
-            .setNegativeButton(android.R.string.cancel, null)
+        AlertDialog.Builder(this).setTitle(R.string.rename_document).setView(input).setNegativeButton(android.R.string.cancel, null)
             .setPositiveButton(R.string.rename) { _, _ ->
                 val newName = input.text.toString().trim()
                 if (newName.isEmpty()) return@setPositiveButton
                 val target = File(file.parentFile, "$newName.pdf")
                 if (target.exists()) { Toast.makeText(this, R.string.file_already_exists, Toast.LENGTH_SHORT).show(); return@setPositiveButton }
                 if (file.renameTo(target)) {
-                    File(file.parentFile, file.nameWithoutExtension + ".txt").renameTo(File(file.parentFile, "$newName.txt"))
-                    loadDocuments()
+                    File(file.parentFile, file.nameWithoutExtension + ".txt").renameTo(File(file.parentFile, "$newName.txt")); loadDocuments()
                 } else Toast.makeText(this, R.string.rename_failed, Toast.LENGTH_SHORT).show()
             }.show()
     }
 
     private fun deleteDocument(file: File) {
-        AlertDialog.Builder(this).setTitle(R.string.delete_document).setMessage(file.name)
-            .setNegativeButton(android.R.string.cancel, null)
+        AlertDialog.Builder(this).setTitle(R.string.delete_document).setMessage(file.name).setNegativeButton(android.R.string.cancel, null)
             .setPositiveButton(R.string.delete) { _, _ ->
-                val deleted = file.delete()
-                File(file.parentFile, file.nameWithoutExtension + ".txt").delete()
+                val deleted = file.delete(); File(file.parentFile, file.nameWithoutExtension + ".txt").delete()
                 if (deleted) loadDocuments() else Toast.makeText(this, R.string.delete_failed, Toast.LENGTH_SHORT).show()
             }.show()
     }
