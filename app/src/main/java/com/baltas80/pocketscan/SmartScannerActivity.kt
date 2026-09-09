@@ -68,14 +68,35 @@ class SmartScannerActivity : AppCompatActivity() {
                 val stamp = SimpleDateFormat("yyyyMMdd_HHmmss", Locale.US).format(Date())
                 val pdfFile = File(dir, "document_$stamp.pdf")
                 val textFile = File(dir, "document_$stamp.txt")
+                val pageDir = File(cacheDir, "scan-pages-$stamp").apply { mkdirs() }
                 try {
                     contentResolver.openInputStream(pdfUri).use { input ->
                         requireNotNull(input) { "No se pudo abrir el PDF" }
                         FileOutputStream(pdfFile).use { output -> input.copyTo(output) }
                     }
-                    Triple(dir, pdfFile, textFile)
+
+                    val enhancedPages = pages.mapIndexedNotNull { index, page ->
+                        val enhanced = File(pageDir, "page-${index + 1}.jpg")
+                        if (DocumentImageEnhancer.enhanceToJpeg(this@SmartScannerActivity, page.imageUri, enhanced)) enhanced else null
+                    }
+
+                    // The Google scanner preview has its own "Mejorar" control. After the
+                    // scanner returns, PocketScan applies a second local pass so saved PDFs
+                    // and OCR retain readable text even when the source page is washed out.
+                    if (enhancedPages.size == pages.size) {
+                        val improvedPdf = File(dir, "document_$stamp.improved.pdf")
+                        if (DocumentImageEnhancer.buildPdfFromJpegs(enhancedPages, improvedPdf)) {
+                            pdfFile.delete()
+                            improvedPdf.renameTo(pdfFile)
+                        } else {
+                            improvedPdf.delete()
+                        }
+                    }
+
+                    Triple(dir, pdfFile, textFile to enhancedPages)
                 } catch (error: Exception) {
                     pdfFile.delete(); textFile.delete()
+                    pageDir.deleteRecursively()
                     null
                 }
             }
@@ -84,8 +105,10 @@ class SmartScannerActivity : AppCompatActivity() {
                 finish()
                 return@launch
             }
-            val (dir, pdfFile, textFile) = prepared
-            runOcr(pages.map { it.imageUri }, textFile) {
+            val (dir, pdfFile, textAndPages) = prepared
+            val (textFile, enhancedPages) = textAndPages
+            val ocrUris = enhancedPages.map { Uri.fromFile(it) }
+            runOcr(ocrUris, textFile) {
                 lifecycleScope.launch {
                     val saved = withContext(Dispatchers.IO) {
                         val ocrText = textFile.takeIf { it.exists() }?.readText(Charsets.UTF_8).orEmpty()
@@ -94,9 +117,11 @@ class SmartScannerActivity : AppCompatActivity() {
                         if (textFile.exists() && textFile.absolutePath != namedText.absolutePath) textFile.renameTo(namedText)
                         val category = DocumentOrganizer.categoryForText(ocrText)
                         val finalPdf = DocumentOrganizer.moveDocument(namedPdf, namedText, dir, category)
-                        Triple(category, finalPdf, pages.size)
+                        Triple(category, finalPdf, enhancedPages.size)
                     }
                     AiAnalysisScheduler.enqueue(this@SmartScannerActivity, saved.second)
+                    enhancedPages.forEach { it.delete() }
+                    enhancedPages.firstOrNull()?.parentFile?.delete()
                     Toast.makeText(this@SmartScannerActivity, "Documento guardado en ${saved.first} (${saved.third} página(s))", Toast.LENGTH_SHORT).show()
                     finish()
                 }
