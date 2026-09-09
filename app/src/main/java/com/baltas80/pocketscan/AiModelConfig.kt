@@ -15,9 +15,11 @@ object AiModelConfig {
     suspend fun modelName(): String {
         val config = FirebaseRemoteConfig.getInstance()
         config.setDefaultsAsync(mapOf(MODEL_NAME_KEY to DEFAULT_MODEL_NAME))
-        suspendCancellableCoroutine<Unit> { continuation ->
-            config.fetchAndActivate().addOnCompleteListener {
-                if (continuation.isActive) continuation.resume(Unit)
+        runCatching {
+            suspendCancellableCoroutine<Unit> { continuation ->
+                config.fetchAndActivate().addOnCompleteListener {
+                    if (continuation.isActive) continuation.resume(Unit)
+                }
             }
         }
         return config.getString(MODEL_NAME_KEY).trim().ifBlank { DEFAULT_MODEL_NAME }
