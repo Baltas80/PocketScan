@@ -6,9 +6,13 @@ import android.widget.Toast
 import androidx.activity.result.IntentSenderRequest
 import androidx.activity.result.contract.ActivityResultContracts.StartIntentSenderForResult
 import androidx.appcompat.app.AppCompatActivity
+import androidx.lifecycle.lifecycleScope
 import com.google.mlkit.vision.documentscanner.GmsDocumentScannerOptions
 import com.google.mlkit.vision.documentscanner.GmsDocumentScanning
 import com.google.mlkit.vision.documentscanner.GmsDocumentScanningResult
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 import java.io.File
 import java.io.FileOutputStream
 import java.text.SimpleDateFormat
@@ -16,6 +20,8 @@ import java.util.Date
 import java.util.Locale
 
 class SmartScannerActivity : AppCompatActivity() {
+    private var scannerStarted = false
+
     private val scannerLauncher = registerForActivityResult(StartIntentSenderForResult()) { result ->
         if (result.resultCode != RESULT_OK) { finish(); return@registerForActivityResult }
         val scanResult = result.data?.let { GmsDocumentScanningResult.fromActivityResultIntent(it) }
@@ -27,15 +33,14 @@ class SmartScannerActivity : AppCompatActivity() {
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
-        startScanner()
+        AppLockManager.ensureUnlocked(this) { allowed ->
+            if (allowed) startScannerOnce() else finish()
+        }
     }
 
-    override fun onResume() {
-        super.onResume()
-        AppLockManager.authenticateIfNeeded(this) { finish() }
-    }
-
-    private fun startScanner() {
+    private fun startScannerOnce() {
+        if (scannerStarted || isFinishing || isDestroyed) return
+        scannerStarted = true
         val options = GmsDocumentScannerOptions.Builder()
             .setGalleryImportAllowed(true)
             .setPageLimit(50)
@@ -43,7 +48,9 @@ class SmartScannerActivity : AppCompatActivity() {
             .setScannerMode(GmsDocumentScannerOptions.SCANNER_MODE_FULL)
             .build()
         GmsDocumentScanning.getClient(options).getStartScanIntent(this)
-            .addOnSuccessListener { intentSender -> scannerLauncher.launch(IntentSenderRequest.Builder(intentSender).build()) }
+            .addOnSuccessListener { intentSender ->
+                if (!isFinishing && !isDestroyed) scannerLauncher.launch(IntentSenderRequest.Builder(intentSender).build())
+            }
             .addOnFailureListener { error ->
                 Toast.makeText(this, error.message ?: "No se pudo iniciar el escáner", Toast.LENGTH_LONG).show(); finish()
             }
@@ -51,30 +58,48 @@ class SmartScannerActivity : AppCompatActivity() {
 
     private fun saveResult(result: GmsDocumentScanningResult) {
         val pdfUri = result.pdf?.uri
-        if (pdfUri == null) { Toast.makeText(this, "El escáner no devolvió un PDF", Toast.LENGTH_LONG).show(); finish(); return }
-        val dir = File(filesDir, "scans").apply { mkdirs() }
-        val stamp = SimpleDateFormat("yyyyMMdd_HHmmss", Locale.US).format(Date())
-        val pdfFile = File(dir, "document_$stamp.pdf")
-        val textFile = File(dir, "document_$stamp.txt")
-        try {
-            contentResolver.openInputStream(pdfUri).use { input ->
-                requireNotNull(input) { "No se pudo abrir el PDF" }
-                FileOutputStream(pdfFile).use { output -> input.copyTo(output) }
+        if (pdfUri == null) {
+            Toast.makeText(this, "El escáner no devolvió un PDF", Toast.LENGTH_LONG).show(); finish(); return
+        }
+        val pages = result.pages.orEmpty()
+        lifecycleScope.launch {
+            val prepared = withContext(Dispatchers.IO) {
+                val dir = File(filesDir, "scans").apply { mkdirs() }
+                val stamp = SimpleDateFormat("yyyyMMdd_HHmmss", Locale.US).format(Date())
+                val pdfFile = File(dir, "document_$stamp.pdf")
+                val textFile = File(dir, "document_$stamp.txt")
+                try {
+                    contentResolver.openInputStream(pdfUri).use { input ->
+                        requireNotNull(input) { "No se pudo abrir el PDF" }
+                        FileOutputStream(pdfFile).use { output -> input.copyTo(output) }
+                    }
+                    Triple(dir, pdfFile, textFile)
+                } catch (error: Exception) {
+                    pdfFile.delete(); textFile.delete()
+                    null
+                }
             }
-            val pages = result.pages.orEmpty()
-            runOcr(pages.map { it.imageUri }, textFile) {
-                val ocrText = textFile.takeIf { it.exists() }?.readText(Charsets.UTF_8).orEmpty()
-                val namedPdf = autoNameDocument(pdfFile, ocrText)
-                val namedText = File(namedPdf.parentFile, namedPdf.nameWithoutExtension + ".txt")
-                if (textFile.exists() && textFile.absolutePath != namedText.absolutePath) textFile.renameTo(namedText)
-                val category = DocumentOrganizer.categoryForText(ocrText)
-                val finalPdf = DocumentOrganizer.moveDocument(namedPdf, namedText, dir, category)
-                Toast.makeText(this, "Documento guardado en $category (${pages.size} página(s))", Toast.LENGTH_SHORT).show()
+            if (prepared == null) {
+                Toast.makeText(this@SmartScannerActivity, "No se pudo guardar el documento", Toast.LENGTH_LONG).show()
                 finish()
+                return@launch
             }
-        } catch (error: Exception) {
-            pdfFile.delete(); textFile.delete()
-            Toast.makeText(this, error.message ?: "No se pudo guardar el documento", Toast.LENGTH_LONG).show(); finish()
+            val (dir, pdfFile, textFile) = prepared
+            runOcr(pages.map { it.imageUri }, textFile) {
+                lifecycleScope.launch {
+                    val saved = withContext(Dispatchers.IO) {
+                        val ocrText = textFile.takeIf { it.exists() }?.readText(Charsets.UTF_8).orEmpty()
+                        val namedPdf = autoNameDocument(pdfFile, ocrText)
+                        val namedText = File(namedPdf.parentFile, namedPdf.nameWithoutExtension + ".txt")
+                        if (textFile.exists() && textFile.absolutePath != namedText.absolutePath) textFile.renameTo(namedText)
+                        val category = DocumentOrganizer.categoryForText(ocrText)
+                        val finalPdf = DocumentOrganizer.moveDocument(namedPdf, namedText, dir, category)
+                        Triple(category, finalPdf, pages.size)
+                    }
+                    Toast.makeText(this@SmartScannerActivity, "Documento guardado en ${saved.first} (${saved.third} página(s))", Toast.LENGTH_SHORT).show()
+                    finish()
+                }
+            }
         }
     }
 
@@ -110,8 +135,13 @@ class SmartScannerActivity : AppCompatActivity() {
         val recognizer = com.google.mlkit.vision.text.TextRecognition.getClient(com.google.mlkit.vision.text.latin.TextRecognizerOptions.DEFAULT_OPTIONS)
         val allText = StringBuilder()
         fun complete() {
-            try { textFile.writeText(allText.toString(), Charsets.UTF_8) }
-            finally { recognizer.close(); onComplete() }
+            lifecycleScope.launch(Dispatchers.IO) {
+                runCatching { textFile.writeText(allText.toString(), Charsets.UTF_8) }
+                withContext(Dispatchers.Main) {
+                    recognizer.close()
+                    onComplete()
+                }
+            }
         }
         fun next(index: Int) {
             if (index >= uris.size) { complete(); return }
