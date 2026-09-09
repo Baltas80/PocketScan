@@ -96,6 +96,7 @@ class SmartScannerActivity : AppCompatActivity() {
                         val finalPdf = DocumentOrganizer.moveDocument(namedPdf, namedText, dir, category)
                         Triple(category, finalPdf, pages.size)
                     }
+                    AiAnalysisScheduler.enqueue(this@SmartScannerActivity, saved.second)
                     Toast.makeText(this@SmartScannerActivity, "Documento guardado en ${saved.first} (${saved.third} página(s))", Toast.LENGTH_SHORT).show()
                     finish()
                 }
