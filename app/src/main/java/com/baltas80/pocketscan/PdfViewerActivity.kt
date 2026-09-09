@@ -3,6 +3,7 @@ package com.baltas80.pocketscan
 import android.content.Intent
 import android.graphics.Bitmap
 import android.graphics.pdf.PdfRenderer
+import android.net.Uri
 import android.os.Bundle
 import android.os.ParcelFileDescriptor
 import android.view.LayoutInflater
@@ -12,6 +13,7 @@ import android.widget.Button
 import android.widget.EditText
 import android.widget.TextView
 import android.widget.Toast
+import androidx.activity.result.contract.ActivityResultContracts.CreateDocument
 import androidx.appcompat.app.AlertDialog
 import androidx.appcompat.app.AppCompatActivity
 import androidx.core.content.FileProvider
@@ -28,6 +30,25 @@ import java.io.File
 class PdfViewerActivity : AppCompatActivity() {
     private lateinit var pdfFile: File
     private lateinit var pageList: RecyclerView
+    private var pendingText = ""
+
+    private val textExportLauncher = registerForActivityResult(CreateDocument("text/plain")) { uri ->
+        if (uri == null) return@registerForActivityResult
+        lifecycleScope.launch(Dispatchers.IO) {
+            val success = runCatching {
+                contentResolver.openOutputStream(uri)?.use { output ->
+                    output.write(pendingText.toByteArray(Charsets.UTF_8))
+                } ?: false
+            }.getOrDefault(false)
+            withContext(Dispatchers.Main) {
+                Toast.makeText(
+                    this@PdfViewerActivity,
+                    if (success) "Texto exportado correctamente" else "No se pudo exportar el texto",
+                    Toast.LENGTH_LONG
+                ).show()
+            }
+        }
+    }
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -43,6 +64,7 @@ class PdfViewerActivity : AppCompatActivity() {
         findViewById<TextView>(R.id.viewerTitle).text = pdfFile.name
         findViewById<Button>(R.id.viewerAi).setOnClickListener { analyzeWithAi() }
         findViewById<Button>(R.id.viewerAsk).setOnClickListener { askAboutDocument() }
+        findViewById<Button>(R.id.viewerExportText).setOnClickListener { exportOcrText() }
         findViewById<Button>(R.id.viewerShare).setOnClickListener { shareDocument() }
         findViewById<Button>(R.id.viewerClose).setOnClickListener { finish() }
         pageList = findViewById(R.id.pdfPagesRecycler)
@@ -66,6 +88,19 @@ class PdfViewerActivity : AppCompatActivity() {
     private fun readOcr(): String {
         val textFile = File(pdfFile.parentFile, pdfFile.nameWithoutExtension + ".txt")
         return runCatching { if (textFile.isFile) textFile.readText(Charsets.UTF_8) else "" }.getOrDefault("")
+    }
+
+    private fun exportOcrText() {
+        lifecycleScope.launch {
+            val text = withContext(Dispatchers.IO) { readOcr().trim() }
+            if (text.isBlank()) {
+                Toast.makeText(this@PdfViewerActivity, "Este documento no tiene texto OCR disponible", Toast.LENGTH_LONG).show()
+                return@launch
+            }
+            pendingText = text + "\n"
+            val baseName = pdfFile.nameWithoutExtension.ifBlank { "documento" }
+            textExportLauncher.launch("$baseName.txt")
+        }
     }
 
     private fun analyzeWithAi() {
