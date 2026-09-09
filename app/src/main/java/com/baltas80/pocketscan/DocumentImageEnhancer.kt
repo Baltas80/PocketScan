@@ -1,13 +1,11 @@
 package com.baltas80.pocketscan
 
+import android.content.Context
 import android.graphics.Bitmap
 import android.graphics.BitmapFactory
-import android.graphics.Canvas
 import android.graphics.Color
 import android.graphics.Paint
-import android.graphics.Rect
 import android.net.Uri
-import android.content.Context
 import java.io.File
 import java.io.FileOutputStream
 import kotlin.math.roundToInt
@@ -18,7 +16,7 @@ import kotlin.math.roundToInt
  * and reducing the washed-out appearance common in low-contrast scans.
  */
 object DocumentImageEnhancer {
-    private const val MAX_DIMENSION = 2600
+    private const val MAX_DIMENSION = 2200
     private const val LOW_PERCENTILE = 0.02f
     private const val HIGH_PERCENTILE = 0.98f
 
@@ -63,10 +61,9 @@ object DocumentImageEnhancer {
         val high = percentile(histogram, pixels.size, HIGH_PERCENTILE).coerceAtLeast(low + 1)
 
         for (i in pixels.indices) {
-            val pixel = pixels[i]
-            val y = luminance(pixel)
+            val y = luminance(pixels[i])
             val stretched = ((y - low) * 255f / (high - low)).roundToInt().coerceIn(0, 255)
-            // Slightly deepen dark text without turning the whole page into pure black.
+            // Deepen dark text slightly without destroying stamps and photographs.
             val adjusted = when {
                 stretched < 90 -> (stretched * 0.78f).roundToInt()
                 stretched < 180 -> (stretched * 0.90f).roundToInt()
