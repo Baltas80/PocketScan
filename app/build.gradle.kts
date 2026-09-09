@@ -44,6 +44,10 @@ dependencies {
     implementation("androidx.camera:camera-view:1.4.1")
     implementation("androidx.exifinterface:exifinterface:1.3.7")
     implementation("com.google.android.gms:play-services-mlkit-text-recognition:19.0.1")
+    implementation("com.google.android.gms:play-services-mlkit-text-recognition-chinese:16.0.1")
+    implementation("com.google.android.gms:play-services-mlkit-text-recognition-devanagari:16.0.1")
+    implementation("com.google.android.gms:play-services-mlkit-text-recognition-japanese:16.0.1")
+    implementation("com.google.android.gms:play-services-mlkit-text-recognition-korean:16.0.1")
     implementation("com.google.android.gms:play-services-mlkit-document-scanner:16.0.0")
 
     // Gemini through Firebase AI Logic. Firebase/App Check configuration is supplied separately.
