@@ -4,8 +4,10 @@ import com.google.firebase.Firebase
 import com.google.firebase.ai.GenerativeModel
 import com.google.firebase.ai.ai
 import com.google.firebase.ai.type.GenerativeBackend
+import com.google.firebase.ai.type.content
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.collect
 import kotlinx.coroutines.flow.flow
 import kotlinx.coroutines.withContext
 import java.io.File
@@ -17,7 +19,7 @@ object AiPdfAssistant {
         val model: GenerativeModel = Firebase.ai(backend = GenerativeBackend.googleAI())
             .generativeModel("gemini-3.8-flash")
         val prompt = content {
-            inlineData(bytes = file.readBytes(), mimeType = "application/pdf")
+            inlineData(file.readBytes(), "application/pdf")
             text("""
                 You are PocketScan's document assistant. Answer the user's question using ONLY information contained in this PDF and the auxiliary OCR below.
                 Do not invent, infer unsupported facts, or use outside knowledge. If the document does not contain enough information, say so clearly.
