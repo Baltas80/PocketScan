@@ -23,6 +23,12 @@
     <string name="search_documents">Nach Name, OCR oder KI suchen</string>
     <string name="ai_description">Frage zu deinen Dokumenten, und PocketScan durchsucht deine intelligente Bibliothek.</string>
     <string name="ai_question_hint">Beispiel: Welche Rechnungen liegen über einem bestimmten Betrag?</string>
+    <string name="ai_example_invoices">Rechnungen</string>
+    <string name="ai_example_total">Gesamt</string>
+    <string name="ai_example_year">Jahr</string>
+    <string name="ai_example_invoices_question">Welche Rechnungen habe ich?</string>
+    <string name="ai_example_total_question">Wie hoch ist die Gesamtsumme meiner Rechnungen?</string>
+    <string name="ai_example_year_question">Welche Rechnungen habe ich aus dem Jahr 2026?</string>
     <string name="ask">Fragen</string>
     <string name="ai_answer_placeholder">Die Antwort erscheint hier.</string>
     <string name="camera_permission_required">Kameraberechtigung zum Scannen erforderlich.</string>
