@@ -44,6 +44,8 @@ object DocumentOrganizer {
         Normalizer.normalize(text, Normalizer.Form.NFKC)
             .replace("\\p{M}+".toRegex(), "")
             .replace("[\\u200B-\\u200D\\uFEFF]".toRegex(), "")
+            .replace("[\\u00A0\\u202F]".toRegex(), " ")
+            .replace("\\r".toRegex(), "\n")
             .lowercase(Locale.ROOT)
 
     fun categoryForFile(file: File, scansDir: File): String {
