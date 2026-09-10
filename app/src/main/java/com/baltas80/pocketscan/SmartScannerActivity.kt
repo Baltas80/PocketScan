@@ -158,31 +158,11 @@ class SmartScannerActivity : AppCompatActivity() {
             .replace(Regex("\\s+"), " ").trim()
 
     private fun runOcr(uris: List<Uri>, textFile: File, onComplete: () -> Unit) {
-        val recognizer = com.google.mlkit.vision.text.TextRecognition.getClient(com.google.mlkit.vision.text.latin.TextRecognizerOptions.DEFAULT_OPTIONS)
-        val allText = StringBuilder()
-        fun complete() {
+        MultilingualOcr.recognizeUris(uris, this) { text ->
             lifecycleScope.launch(Dispatchers.IO) {
-                runCatching { textFile.writeText(allText.toString().trim() + "\n", Charsets.UTF_8) }
-                withContext(Dispatchers.Main) {
-                    recognizer.close()
-                    onComplete()
-                }
+                runCatching { textFile.writeText(text.trim() + "\n", Charsets.UTF_8) }
+                withContext(Dispatchers.Main) { onComplete() }
             }
         }
-        fun next(index: Int) {
-            if (index >= uris.size) { complete(); return }
-            try {
-                val image = com.google.mlkit.vision.common.InputImage.fromFilePath(this, uris[index])
-                recognizer.process(image).addOnSuccessListener { text ->
-                    if (text.text.isNotBlank()) {
-                        if (allText.isNotEmpty()) allText.append("\n\n")
-                        allText.append("===== PÁGINA ${index + 1} =====\n")
-                        allText.append(text.text.trim())
-                    }
-                    next(index + 1)
-                }.addOnFailureListener { next(index + 1) }
-            } catch (_: Exception) { next(index + 1) }
-        }
-        next(0)
     }
 }
