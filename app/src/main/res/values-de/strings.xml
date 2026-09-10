@@ -39,6 +39,7 @@
     <string name="camera_permission_required">Kameraberechtigung zum Scannen erforderlich.</string>
     <string name="saved_as_pdf">Dokument als PDF gespeichert.</string>
     <string name="share_document">Dokument teilen</string>
+    <string name="open">Öffnen</string>
     <string name="rename_document">Dokument umbenennen</string>
     <string name="rename">Umbenennen</string>
     <string name="delete_document">Dokument löschen</string>
