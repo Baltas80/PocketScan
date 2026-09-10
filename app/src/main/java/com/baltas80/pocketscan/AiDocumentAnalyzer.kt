@@ -11,6 +11,7 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import org.json.JSONObject
 import java.io.File
+import java.text.Normalizer
 import java.util.Locale
 
 object AiDocumentAnalyzer {
@@ -32,7 +33,7 @@ $auxiliaryOcr""".trimIndent()) }
         val json=JSONObject(model.generateContent(prompt).text ?: error("AI returned no content")); val fields=linkedMapOf<String,String>(); listOf("proveedor","cliente","nif_cif","numero","fecha","vencimiento","subtotal","iva","total","moneda","periodo","direccion","telefono","concepto").forEach { key -> json.optString(key).trim().takeIf{it.isNotEmpty()}?.let{fields[key]=it} }; Analysis(normalizeCategory(json.optString("category")),json.optString("title","Document").ifBlank{"Document"},json.optString("summary","").trim(),fields,"gemini")
     }
     private fun localAnalysis(file: File,text:String): Analysis {
-        val category=DocumentOrganizer.categoryForText(text); val type=when(category){DocumentOrganizer.FACTURAS->"Factura";DocumentOrganizer.PRESUPUESTOS->"Presupuesto";DocumentOrganizer.CONTRATOS->"Contrato";DocumentOrganizer.RECIBOS->"Recibo";DocumentOrganizer.TICKETS->"Ticket";DocumentOrganizer.NOMINAS->"Nómina";DocumentOrganizer.CERTIFICADOS->"Certificado";DocumentOrganizer.INFORMES->"Informe";DocumentOrganizer.CITAS->"Cita";else->"Documento"}
+        val category=DocumentOrganizer.categoryForText(text); val type=when(category){DocumentOrganizer.FACTURAS->"Factura";DocumentOrganizer.PRESUPUESTOS->"Presupuesto";DocumentOrganizer.CONTRATOS->"Contrato";DocumentOrganizer.RECIBOS->"Recibo";DocumentOrganizer.TICKETS->"Ticket";DocumentOrganizer.NOMINAS->"Nomina";DocumentOrganizer.CERTIFICADOS->"Certificado";DocumentOrganizer.INFORMES->"Informe";DocumentOrganizer.CITAS->"Cita";else->"Documento"}
         val usefulLine=text.lineSequence().map{it.trim()}.firstOrNull{it.length>=4&&it.any(Char::isLetter)&&it.count(Char::isDigit)<it.length/2&&!it.equals(type,true)&&!isOcrMarkerLine(it)&&!isGenericHeaderLine(it)}; val title=usefulLine?.replace(Regex("\\s+")," ")?.take(70)?.ifBlank{"$type - ${file.nameWithoutExtension}"} ?: "$type - ${file.nameWithoutExtension}"
         val fields=linkedMapOf<String,String>(); monetaryField(text,Regex("(?i)^(?:total|importe total|total\\s+amount|montant total|gesamtbetrag|totale)\\s*[:=]?\\s*(?:(€|EUR|USD|\\$|GBP|£)\\s*)?([0-9][0-9.,]*)(?:\\s*(€|EUR|USD|\\$|GBP|£))?\\s*$"))?.let{m->fields["total"]=m.value;m.currency?.let{fields["moneda"]=normalizeCurrency(it)}}
         firstMatch(text,Regex("(?im)^\\s*(?:iva|vat|tva|mwst)\\s*[:=]?\\s*([0-9]+(?:[.,][0-9]+)?\\s*%?)\\s*$"))?.let{fields["iva"]=cleanField(it)}; firstMatch(text,Regex("(?im)^\\s*(?:fecha|date|datum|data)\\s*[:.-]?\\s*(\\d{1,4}[./-]\\d{1,2}[./-]\\d{1,4})\\s*$"))?.let{fields["fecha"]=it}; firstMatch(text,Regex("(?im)^\\s*(?:nif|cif|nie|vat|tax id|tax identification number)\\s*[:.-]?\\s*((?:[A-Z]{1,3})?[0-9]{7,12}[A-Z]?)\\s*$"))?.let{fields["nif_cif"]=it}; firstMatch(text,Regex("(?im)^\\s*(?:n[uú]mero|nº|n°|num(?:ero)?|no\\.?|referencia|ref\\.?|reference|expediente)\\s*[:#.-]?\\s*([A-Z0-9][A-Z0-9./_-]{2,30})\\s*$"))?.let{fields["numero"]=it}; firstMatch(text,Regex("(?im)^\\s*(?:fecha de vencimiento|due date|vencimiento|f\\.? venc\\.?)\\s*[:.-]?\\s*(\\d{1,4}[./-]\\d{1,2}[./-]\\d{1,4})\\s*$"))?.let{fields["vencimiento"]=it}
@@ -43,7 +44,10 @@ $auxiliaryOcr""".trimIndent()) }
     private data class Match(val value:String,val currency:String?)
     private fun monetaryField(text:String,regex:Regex):Match?=text.lineSequence().map{it.trim()}.mapNotNull{line->regex.matchEntire(line)?.let{r->val value=r.groupValues.getOrNull(2)?.trim().orEmpty();if(value.isBlank())null else Match(value,r.groupValues.getOrNull(1)?.trim()?.takeIf{it.isNotEmpty()}?:r.groupValues.getOrNull(3)?.trim()?.takeIf{it.isNotEmpty()})}}.firstOrNull()
     private fun cleanField(value:String)=value.replace(Regex("\\s+")," ").trim().trim('.',':',';','-')
-    private fun isOcrMarkerLine(line:String)=line.matches(Regex("(?i)^=+\\s*p[áa]gina\\s+\\d+\\s*=+$"))||line.matches(Regex("(?i)^-+\\s*p[áa]gina\\s+\\d+\\s*-+$"))
+    private fun isOcrMarkerLine(line:String):Boolean {
+        val normalized=Normalizer.normalize(line,Normalizer.Form.NFD).replace(Regex("\\p{M}+"),"").lowercase(Locale.ROOT).trim()
+        return normalized.matches(Regex("^[=-]+\\s*pagina\\s+\\d+\\s*[=-]+$"))
+    }
     private fun isGenericHeaderLine(line:String):Boolean{val normalized=line.lowercase(Locale.ROOT).replace(Regex("[^a-záéíóúüñ ]")," ").replace(Regex("\\s+")," ").trim();return normalized in setOf("ministerio","ministerio de inclusion","seguridad social","seguridad ciudadana","documento","pagina","servicio","secretaria de estado","renta de la seguridad social y pensiones")}
     private fun firstMatch(text:String,regex:Regex):String?=text.lineSequence().map{it.trim()}.firstNotNullOfOrNull{line->regex.matchEntire(line)?.groupValues?.getOrNull(1)?.trim()?.takeIf{it.isNotEmpty()}}
     private fun normalizeCurrency(value:String)=when(value.uppercase(Locale.ROOT)){"€","EUR"->"EUR";"$","USD"->"USD";"£","GBP"->"GBP";else->value}
