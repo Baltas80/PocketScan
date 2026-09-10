@@ -2,8 +2,9 @@
 <LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
     android:layout_width="match_parent"
     android:layout_height="wrap_content"
-    android:orientation="vertical"
-    android:padding="12dp">
+    android:layout_marginBottom="10dp"
+    android:background="@drawable/bg_document_card"
+    android:orientation="vertical">
 
     <TextView
         android:id="@+id/documentName"
@@ -11,6 +12,7 @@
         android:layout_height="wrap_content"
         android:maxLines="2"
         android:ellipsize="end"
+        android:textColor="@color/pocketscan_text"
         android:textSize="17sp"
         android:textStyle="bold" />
 
@@ -18,7 +20,8 @@
         android:id="@+id/documentCategory"
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
-        android:paddingTop="2dp"
+        android:paddingTop="3dp"
+        android:textColor="@color/pocketscan_blue_dark"
         android:textSize="13sp" />
 
     <TextView
@@ -26,26 +29,27 @@
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
         android:paddingTop="2dp"
+        android:textColor="@color/pocketscan_muted"
         android:textSize="12sp" />
 
     <LinearLayout
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
-        android:layout_marginTop="6dp"
+        android:layout_marginTop="8dp"
         android:orientation="vertical">
         <LinearLayout
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
             android:orientation="horizontal">
-            <Button android:id="@+id/openButton" android:layout_width="0dp" android:layout_height="wrap_content" android:layout_weight="1" android:minHeight="48dp" android:text="Abrir" />
-            <Button android:id="@+id/shareButton" android:layout_width="0dp" android:layout_height="wrap_content" android:layout_weight="1" android:minHeight="48dp" android:layout_marginStart="6dp" android:text="Compartir" />
+            <Button android:id="@+id/openButton" android:layout_width="0dp" android:layout_height="wrap_content" android:layout_weight="1" android:minHeight="48dp" android:text="@string/open" />
+            <Button android:id="@+id/shareButton" android:layout_width="0dp" android:layout_height="wrap_content" android:layout_weight="1" android:minHeight="48dp" android:layout_marginStart="6dp" android:text="@string/share_document" />
         </LinearLayout>
         <LinearLayout
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
             android:orientation="horizontal">
-            <Button android:id="@+id/renameButton" android:layout_width="0dp" android:layout_height="wrap_content" android:layout_weight="1" android:minHeight="48dp" android:text="Renombrar" />
-            <Button android:id="@+id/deleteButton" android:layout_width="0dp" android:layout_height="wrap_content" android:layout_weight="1" android:minHeight="48dp" android:layout_marginStart="6dp" android:text="Borrar" />
+            <Button android:id="@+id/renameButton" android:layout_width="0dp" android:layout_height="wrap_content" android:layout_weight="1" android:minHeight="48dp" android:text="@string/rename_document" />
+            <Button android:id="@+id/deleteButton" android:layout_width="0dp" android:layout_height="wrap_content" android:layout_weight="1" android:minHeight="48dp" android:layout_marginStart="6dp" android:text="@string/delete_document" />
         </LinearLayout>
     </LinearLayout>
 </LinearLayout>
