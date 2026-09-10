@@ -20,9 +20,8 @@ import androidx.core.content.FileProvider
 import androidx.lifecycle.lifecycleScope
 import androidx.recyclerview.widget.LinearLayoutManager
 import androidx.recyclerview.widget.RecyclerView
-import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.Job
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import java.io.File
@@ -69,7 +68,7 @@ class PdfViewerActivity : AppCompatActivity() {
                 finish()
                 return@launch
             }
-            pageList.adapter = PdfPageAdapter(pdfFile, pageCount)
+            pageList.adapter = PdfPageAdapter(pdfFile, pageCount, lifecycleScope)
         }
     }
 
@@ -109,6 +108,7 @@ class PdfViewerActivity : AppCompatActivity() {
                 Toast.makeText(this@PdfViewerActivity, "Corrigiendo errores de OCR con IA…", Toast.LENGTH_SHORT).show()
                 val corrected = AiPdfAssistant.correctOcr(ocr).trim()
                 if (corrected.isBlank()) throw IllegalStateException("La IA no devolvió texto corregido")
+                withContext(Dispatchers.IO) { saveOcr(corrected) }
                 pendingText = corrected + "\n"
                 val baseName = pdfFile.nameWithoutExtension.ifBlank { "documento" }
                 correctedTextExportLauncher.launch("$baseName-corregido.txt")
@@ -122,6 +122,11 @@ class PdfViewerActivity : AppCompatActivity() {
                 button.isEnabled = true
             }
         }
+    }
+
+    private fun saveOcr(text: String) {
+        val textFile = File(pdfFile.parentFile, pdfFile.nameWithoutExtension + ".txt")
+        textFile.writeText(text + "\n", Charsets.UTF_8)
     }
 
     private fun writePendingText(uri: Uri) {
@@ -235,11 +240,15 @@ class PdfViewerActivity : AppCompatActivity() {
     companion object { const val EXTRA_PATH = "pdf_path" }
 }
 
-private class PdfPageAdapter(private val file: File, private val pageCount: Int) : RecyclerView.Adapter<PdfPageAdapter.PageHolder>() {
+private class PdfPageAdapter(
+    private val file: File,
+    private val pageCount: Int,
+    private val scope: CoroutineScope
+) : RecyclerView.Adapter<PdfPageAdapter.PageHolder>() {
     override fun onCreateViewHolder(parent: ViewGroup, viewType: Int): PageHolder =
         PageHolder(LayoutInflater.from(parent.context).inflate(R.layout.item_pdf_page, parent, false))
     override fun getItemCount(): Int = pageCount
-    override fun onBindViewHolder(holder: PageHolder, position: Int) { holder.bind(file, position) }
+    override fun onBindViewHolder(holder: PageHolder, position: Int) { holder.bind(file, position, scope) }
     override fun onViewRecycled(holder: PageHolder) { holder.clear(); super.onViewRecycled(holder) }
 
     class PageHolder(view: View) : RecyclerView.ViewHolder(view) {
@@ -247,12 +256,14 @@ private class PdfPageAdapter(private val file: File, private val pageCount: Int)
         private val label = view.findViewById<TextView>(R.id.pdfPageNumber)
         private var generation = 0
         private var bitmap: Bitmap? = null
+        private var renderJob: Job? = null
 
-        fun bind(file: File, pageIndex: Int) {
+        fun bind(file: File, pageIndex: Int, scope: CoroutineScope) {
+            clear()
             val currentGeneration = ++generation
             image.setImageDrawable(null)
             label.text = "Página ${pageIndex + 1}"
-            ViewerScope.scope.launch(Dispatchers.IO) {
+            renderJob = scope.launch(Dispatchers.IO) {
                 val rendered = render(file, pageIndex, image.resources.displayMetrics.widthPixels)
                 withContext(Dispatchers.Main) {
                     if (generation == currentGeneration && rendered != null) {
@@ -265,6 +276,8 @@ private class PdfPageAdapter(private val file: File, private val pageCount: Int)
 
         fun clear() {
             generation++
+            renderJob?.cancel()
+            renderJob = null
             image.setImageDrawable(null)
             bitmap?.recycle()
             bitmap = null
@@ -285,8 +298,4 @@ private class PdfPageAdapter(private val file: File, private val pageCount: Int)
             }
         }.getOrNull()
     }
-}
-
-private object ViewerScope {
-    val scope = CoroutineScope(Dispatchers.Main.immediate + SupervisorJob())
 }
