@@ -22,6 +22,7 @@ import androidx.recyclerview.widget.LinearLayoutManager
 import androidx.recyclerview.widget.RecyclerView
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
+import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import java.io.File
@@ -91,7 +92,7 @@ class DocumentsActivity : AppCompatActivity() {
                     analysis != null && normalizeSearch(listOf(analysis.title, analysis.summary, analysis.category, analysis.fields.values.joinToString(" ")).joinToString(" ")).contains(query)
                 }
             }
-            if (isFinishing || isDestroyed) return@launch
+            if (isFinishing || isDestroyed || !isActive) return@launch
             documents.clear(); documents.addAll(filtered); adapter.notifyDataSetChanged()
         }
     }
