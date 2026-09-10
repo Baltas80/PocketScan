@@ -56,15 +56,25 @@ object MultilingualOcr {
         processFile(0)
     }
 
-    /** Keep Latin unless it is only a weak fragment and another script has clear evidence. */
+    /** Prefer a coherent Latin result, but reject weak Latin fragments when a script has strong evidence. */
     private fun selectCandidate(candidates: List<Candidate>): Candidate? {
+        if (candidates.isEmpty()) return null
         val latin = candidates.firstOrNull { it.name == "latin" }
         val strongNonLatin = candidates.filter { it.name != "latin" && hasStrongScriptEvidence(it.name, it.text) }
             .maxByOrNull { scriptScore(it.name, it.text) }
-        if (latin == null) return strongNonLatin ?: candidates.maxByOrNull { it.text.length }
+        if (latin == null) return strongNonLatin ?: candidates.maxByOrNull { textQualityScore(it.text) }
         if (strongNonLatin == null) return latin
-        val latinLetters = latin.text.count { it.isLetter() }
-        return if (latinLetters < 3) strongNonLatin else latin
+        val latinScore = textQualityScore(latin.text)
+        val nonLatinScore = scriptScore(strongNonLatin.name, strongNonLatin.text)
+        return if (latinScore >= 100 || latinScore >= nonLatinScore) latin else strongNonLatin
+    }
+
+    private fun textQualityScore(text: String): Int {
+        val letters = text.count { it.isLetter() }
+        val digits = text.count { it.isDigit() }
+        val whitespace = text.count { it.isWhitespace() }
+        val controls = text.count { it.isISOControl() }
+        return letters * 4 + digits * 2 + whitespace - controls * 10
     }
 
     private fun scriptScore(name: String, text: String): Int {
