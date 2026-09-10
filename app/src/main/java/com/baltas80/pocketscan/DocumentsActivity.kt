@@ -35,9 +35,9 @@ class DocumentsActivity : AppCompatActivity() {
     private val documents = mutableListOf<File>()
     private val allDocuments = mutableListOf<File>()
     private lateinit var adapter: DocumentAdapter
+    private var filterJob: Job? = null
     private val scansDir get() = File(filesDir, "scans")
     private val categoryKeys = DocumentOrganizer.categories
-    private var filterJob: Job? = null
     private val importImagesLauncher = registerForActivityResult(ActivityResultContracts.GetMultipleContents()) { uris -> if (!uris.isNullOrEmpty()) importImagesAsPdf(uris) }
 
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -54,7 +54,16 @@ class DocumentsActivity : AppCompatActivity() {
         searchInput.addTextChangedListener(object : TextWatcher { override fun beforeTextChanged(s: CharSequence?, start: Int, count: Int, after: Int) = Unit; override fun onTextChanged(s: CharSequence?, start: Int, before: Int, count: Int) = applyFilters(); override fun afterTextChanged(s: Editable?) = Unit })
     }
 
-    override fun onResume() { super.onResume(); AppLockManager.authenticateIfNeeded(this) { finish() }; loadDocuments() }
+    override fun onResume() {
+        super.onResume()
+        AppLockManager.authenticateIfNeeded(this) { finish() }
+        if (!isFinishing && !isDestroyed) loadDocuments()
+    }
+
+    override fun onDestroy() {
+        filterJob?.cancel()
+        super.onDestroy()
+    }
 
     private fun loadDocuments() {
         lifecycleScope.launch {
@@ -82,7 +91,7 @@ class DocumentsActivity : AppCompatActivity() {
                     analysis != null && normalizeSearch(listOf(analysis.title, analysis.summary, analysis.category, analysis.fields.values.joinToString(" ")).joinToString(" ")).contains(query)
                 }
             }
-            if (isFinishing || isDestroyed) return@launch
+            if (isFinishing || isDestroyed || !isActive) return@launch
             documents.clear(); documents.addAll(filtered); adapter.notifyDataSetChanged()
         }
     }
