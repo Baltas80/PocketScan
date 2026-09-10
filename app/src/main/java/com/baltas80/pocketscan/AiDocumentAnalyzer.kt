@@ -95,25 +95,25 @@ object AiDocumentAnalyzer {
         val title = usefulLine?.replace(Regex("\\s+"), " ")?.take(70)?.ifBlank { "$type - ${file.nameWithoutExtension}" } ?: "$type - ${file.nameWithoutExtension}"
 
         val fields = linkedMapOf<String, String>()
-        firstMatchGroups(text, Regex("(?i)\\b(?:total|importe total|total amount|montant total|gesamtbetrag|totale)\\s*[:=]?\\s*(?:(€|EUR|USD|\\$|GBP|£)\\s*)?([0-9][0-9.,]*)(?:\\s*(€|EUR|USD|\\$|GBP|£))?"))?.let { match ->
+        firstMatchGroups(text, Regex("(?im)^\\s*(?:total|importe total|total amount|montant total|gesamtbetrag|totale)\\s*[:=]?\\s*(?:(€|EUR|USD|\\$|GBP|£)\\s*)?([0-9][0-9.,]*)(?:\\s*(€|EUR|USD|\\$|GBP|£))?\\s*$"))?.let { match ->
             fields["total"] = match.value
             match.currency?.let { fields["moneda"] = normalizeCurrency(it) }
         }
-        firstMatch(text, Regex("(?i)\\b(?:iva|vat|tva|mwst)\\s*[:=]?\\s*([0-9]+(?:[.,][0-9]+)?\\s*%?)"))?.let { fields["iva"] = cleanField(it) }
-        firstMatch(text, Regex("(?i)\\b(?:fecha|date|datum|data)\\s*[:.-]?\\s*(\\d{1,4}[./-]\\d{1,2}[./-]\\d{1,4})"))?.let { fields["fecha"] = it }
-        firstMatch(text, Regex("(?i)\\b(?:nif|cif|nie|vat|tax id)\\s*[:.-]?\\s*((?:[A-Z]{1,3})?[0-9]{7,12}[A-Z]?)"))?.let { fields["nif_cif"] = it }
-        firstMatch(text, Regex("(?i)\\b(?:n[uú]mero|nº|n°|num(?:ero)?|no\\.?|referencia|ref\\.?|expediente)\\s*[:#.-]?\\s*([A-Z0-9][A-Z0-9./_-]{2,30})"))?.let { fields["numero"] = it }
-        firstMatch(text, Regex("(?i)\\b(?:fecha de vencimiento|due date|vencimiento|f\\.? venc\\.?)\\s*[:.-]?\\s*(\\d{1,4}[./-]\\d{1,4}[./-]\\d{1,4})"))?.let { fields["vencimiento"] = it }
-        firstMatchGroups(text, Regex("(?i)\\b(?:subtotal|base imponible|base)\\s*[:=]?\\s*(?:(€|EUR|USD|\\$|GBP|£)\\s*)?([0-9][0-9.,]*)(?:\\s*(€|EUR|USD|\\$|GBP|£))?"))?.let { match ->
+        firstMatch(text, Regex("(?im)^\\s*(?:iva|vat|tva|mwst)\\s*[:=]?\\s*([0-9]+(?:[.,][0-9]+)?\\s*%?)\\s*$"))?.let { fields["iva"] = cleanField(it) }
+        firstMatch(text, Regex("(?im)^\\s*(?:fecha|date|datum|data)\\s*[:.-]?\\s*(\\d{1,4}[./-]\\d{1,2}[./-]\\d{1,4})\\s*$"))?.let { fields["fecha"] = it }
+        firstMatch(text, Regex("(?im)^\\s*(?:nif|cif|nie|vat|tax id|tax identification number)\\s*[:.-]?\\s*((?:[A-Z]{1,3})?[0-9]{7,12}[A-Z]?)\\s*$"))?.let { fields["nif_cif"] = it }
+        firstMatch(text, Regex("(?im)^\\s*(?:n[uú]mero|nº|n°|num(?:ero)?|no\\.?|referencia|ref\\.?|reference|expediente)\\s*[:#.-]?\\s*([A-Z0-9][A-Z0-9./_-]{2,30})\\s*$"))?.let { fields["numero"] = it }
+        firstMatch(text, Regex("(?im)^\\s*(?:fecha de vencimiento|due date|vencimiento|f\\.? venc\\.?)\\s*[:.-]?\\s*(\\d{1,4}[./-]\\d{1,2}[./-]\\d{1,4})\\s*$"))?.let { fields["vencimiento"] = it }
+        firstMatchGroups(text, Regex("(?im)^\\s*(?:subtotal|base imponible|base)\\s*[:=]?\\s*(?:(€|EUR|USD|\\$|GBP|£)\\s*)?([0-9][0-9.,]*)(?:\\s*(€|EUR|USD|\\$|GBP|£))?\\s*$"))?.let { match ->
             fields["subtotal"] = match.value
             if (!fields.containsKey("moneda")) match.currency?.let { fields["moneda"] = normalizeCurrency(it) }
         }
-        firstMatch(text, Regex("(?i)\\b(?:periodo|per[ií]odo|ejercicio|campaign|campa[nñ]a)\\s*[:.-]?\\s*([^\\n]{2,60})"))?.let { fields["periodo"] = cleanField(it) }
-        firstMatch(text, Regex("(?i)\\b(?:tel[eé]fono|tel\\.?|phone|telephone)\\s*[:.-]?\\s*([+0-9][0-9 ()-]{6,24})"))?.let { fields["telefono"] = cleanField(it) }
-        firstMatch(text, Regex("(?i)\\b(?:direcci[oó]n|domicilio|address)\\s*[:.-]?\\s*([^\\n]{4,100})"))?.let { fields["direccion"] = cleanField(it) }
-        firstMatch(text, Regex("(?i)\\b(?:concepto|asunto|motivo|description|descripci[oó]n)\\s*[:.-]?\\s*([^\\n]{3,120})"))?.let { fields["concepto"] = cleanField(it) }
-        firstMatch(text, Regex("(?i)\\b(?:proveedor|emisor|empresa|entidad)\\s*[:.-]?\\s*([^\\n]{3,100})"))?.let { fields["proveedor"] = cleanField(it) }
-        firstMatch(text, Regex("(?i)\\b(?:cliente|destinatario|beneficiario|titular)\\s*[:.-]?\\s*([^\\n]{3,100})"))?.let { fields["cliente"] = cleanField(it) }
+        firstMatch(text, Regex("(?im)^\\s*(?:periodo|per[ií]odo|ejercicio|campaign|campa[nñ]a)\\s*[:.-]?\\s*([^\\r\\n]{2,60}?)\\s*$"))?.let { fields["periodo"] = cleanField(it) }
+        firstMatch(text, Regex("(?im)^\\s*(?:tel[eé]fono|tel\\.?|phone|telephone)\\s*[:.-]?\\s*([+0-9][0-9 ()-]{6,24})\\s*$"))?.let { fields["telefono"] = cleanField(it) }
+        firstMatch(text, Regex("(?im)^\\s*(?:direcci[oó]n|domicilio|address)\\s*[:.-]?\\s*([^\\r\\n]{4,100}?)\\s*$"))?.let { fields["direccion"] = cleanField(it) }
+        firstMatch(text, Regex("(?im)^\\s*(?:concepto|asunto|motivo|description|descripci[oó]n)\\s*[:.-]?\\s*([^\\r\\n]{3,120}?)\\s*$"))?.let { fields["concepto"] = cleanField(it) }
+        firstMatch(text, Regex("(?im)^\\s*(?:proveedor|emisor|empresa|entidad|supplier|vendor|issuer|company)\\s*[:.-]?\\s*([^\\r\\n]{3,100}?)\\s*$"))?.let { fields["proveedor"] = cleanField(it) }
+        firstMatch(text, Regex("(?im)^\\s*(?:cliente|destinatario|beneficiario|titular|customer|client|recipient|beneficiary|account holder)\\s*[:.-]?\\s*([^\\r\\n]{3,100}?)\\s*$"))?.let { fields["cliente"] = cleanField(it) }
 
         val summary = if (text.isBlank()) "No OCR disponible para un análisis local más preciso." else text.lineSequence().map { it.trim() }.filter { it.isNotBlank() && !isOcrMarkerLine(it) }.joinToString(" ").replace(Regex("\\s+"), " ").trim().take(700)
         return Analysis(category, title, summary, fields)
