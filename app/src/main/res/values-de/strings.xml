@@ -51,5 +51,7 @@
     <string name="no_indexed_documents">Noch keine Dokumente indiziert.</string>
     <string name="no_sufficient_library_info">Nicht genügend Informationen in der Bibliothek gefunden.</string>
     <string name="cloud_ai_unavailable">Cloud-KI ist nicht verfügbar. Verwandte lokale Dokumente:</string>
+    <string name="ai_status_ready">KI: analysiert</string>
+    <string name="ai_status_pending">KI: Analyse ausstehend</string>
     <string name="ai_analysis_started">KI-Analyse gestartet.</string>
 </resources>
