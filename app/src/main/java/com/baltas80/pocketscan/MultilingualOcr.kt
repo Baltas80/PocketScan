@@ -17,7 +17,11 @@ object MultilingualOcr {
     private data class Candidate(val name: String, val text: String)
 
     fun recognize(files: List<File>, context: Context, onComplete: (String) -> Unit) {
-        if (files.isEmpty()) { onComplete(""); return }
+        recognizeUris(files.map { Uri.fromFile(it) }, context, onComplete)
+    }
+
+    fun recognizeUris(uris: List<Uri>, context: Context, onComplete: (String) -> Unit) {
+        if (uris.isEmpty()) { onComplete(""); return }
         val recognizers: List<Pair<String, TextRecognizer>> = listOf(
             "latin" to TextRecognition.getClient(TextRecognizerOptions.DEFAULT_OPTIONS),
             "chinese" to TextRecognition.getClient(ChineseTextRecognizerOptions.Builder().build()),
@@ -27,10 +31,10 @@ object MultilingualOcr {
         )
         val output = StringBuilder()
         fun finishAll() { recognizers.forEach { it.second.close() }; onComplete(output.toString()) }
-        fun processFile(index: Int) {
-            if (index >= files.size) { finishAll(); return }
-            val image = runCatching { InputImage.fromFilePath(context, Uri.fromFile(files[index])) }.getOrNull()
-            if (image == null) { processFile(index + 1); return }
+        fun processUri(index: Int) {
+            if (index >= uris.size) { finishAll(); return }
+            val image = runCatching { InputImage.fromFilePath(context, uris[index]) }.getOrNull()
+            if (image == null) { processUri(index + 1); return }
             val candidates = mutableListOf<Candidate>()
             var remaining = recognizers.size
             var finished = false
@@ -41,7 +45,7 @@ object MultilingualOcr {
                     if (output.isNotEmpty()) output.append("\n\n")
                     output.append(it.text)
                 }
-                processFile(index + 1)
+                processUri(index + 1)
             }
             recognizers.forEach { (name, recognizer) ->
                 recognizer.process(image)
@@ -53,7 +57,7 @@ object MultilingualOcr {
                     .addOnCompleteListener { remaining--; if (remaining == 0) finishPage() }
             }
         }
-        processFile(0)
+        processUri(0)
     }
 
     /** Prefer a coherent Latin result, but reject weak Latin fragments when a script has strong evidence. */
