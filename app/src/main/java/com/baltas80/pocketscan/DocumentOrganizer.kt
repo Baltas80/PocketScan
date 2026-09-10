@@ -1,6 +1,8 @@
 package com.baltas80.pocketscan
 
 import java.io.File
+import java.text.Normalizer
+import java.util.Locale
 
 object DocumentOrganizer {
     const val GENERAL = "General"
@@ -20,20 +22,26 @@ object DocumentOrganizer {
     )
 
     fun categoryForText(text: String): String {
-        val value = text.lowercase()
+        val value = normalizeForClassification(text)
         return when {
-            value.contains("factura") || value.contains("invoice") -> FACTURAS
+            value.contains("factura") || value.contains("factur4") || value.contains("invoice") -> FACTURAS
             value.contains("presupuesto") || value.contains("quotation") || value.contains("estimate") -> PRESUPUESTOS
             value.contains("contrato") || value.contains("contract") -> CONTRATOS
             value.contains("recibo") || value.contains("receipt") -> RECIBOS
             value.contains("ticket") || value.contains("tique") -> TICKETS
-            value.contains("nómina") || value.contains("nomina") || value.contains("payroll") -> NOMINAS
+            value.contains("nomina") || value.contains("payroll") -> NOMINAS
             value.contains("certificado") || value.contains("certificate") -> CERTIFICADOS
             value.contains("informe") || value.contains("report") -> INFORMES
             value.contains("cita") || value.contains("appointment") -> CITAS
             else -> GENERAL
         }
     }
+
+    private fun normalizeForClassification(text: String): String =
+        Normalizer.normalize(text, Normalizer.Form.NFD)
+            .replace("\\p{M}+".toRegex(), "")
+            .replace("[\\u200B-\\u200D\\uFEFF]".toRegex(), "")
+            .lowercase(Locale.ROOT)
 
     fun categoryForFile(file: File, scansDir: File): String {
         val relative = file.relativeToOrSelf(scansDir).path
