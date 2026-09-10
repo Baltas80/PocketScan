@@ -2,6 +2,7 @@
 <resources>
     <string name="app_name">PocketScan</string>
     <string name="tagline">Scannen. Verbessern. Speichern. Teilen.</string>
+    <string name="home_headline">Alle deine Dokumente an einem Ort</string>
     <string name="scan_document">Dokument scannen</string>
     <string name="my_documents">Meine Dokumente</string>
     <string name="all_categories">Alle</string>
