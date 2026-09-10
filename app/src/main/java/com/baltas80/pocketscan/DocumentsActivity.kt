@@ -21,6 +21,7 @@ import androidx.lifecycle.lifecycleScope
 import androidx.recyclerview.widget.LinearLayoutManager
 import androidx.recyclerview.widget.RecyclerView
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.Job
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import java.io.File
@@ -36,6 +37,7 @@ class DocumentsActivity : AppCompatActivity() {
     private lateinit var adapter: DocumentAdapter
     private val scansDir get() = File(filesDir, "scans")
     private val categoryKeys = DocumentOrganizer.categories
+    private var filterJob: Job? = null
     private val importImagesLauncher = registerForActivityResult(ActivityResultContracts.GetMultipleContents()) { uris -> if (!uris.isNullOrEmpty()) importImagesAsPdf(uris) }
 
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -63,20 +65,21 @@ class DocumentsActivity : AppCompatActivity() {
     }
 
     private fun applyFilters() {
-        val query = searchInput.text?.toString().orEmpty().trim().lowercase()
+        filterJob?.cancel()
+        val query = normalizeSearch(searchInput.text?.toString().orEmpty().trim())
         val selectedCategory = categorySpinner.selectedItemPosition.takeIf { it > 0 }?.let { categoryKeys.getOrNull(it - 1) }
         val snapshot = allDocuments.toList()
-        lifecycleScope.launch {
+        filterJob = lifecycleScope.launch {
             val filtered = withContext(Dispatchers.IO) {
                 snapshot.filter { file ->
                     val category = DocumentOrganizer.categoryForFile(file, scansDir)
                     if (selectedCategory != null && category != selectedCategory) return@filter false
                     if (query.isEmpty()) return@filter true
-                    if (file.nameWithoutExtension.lowercase().contains(query)) return@filter true
+                    if (normalizeSearch(file.nameWithoutExtension).contains(query)) return@filter true
                     val textSidecar = File(file.parentFile, file.nameWithoutExtension + ".txt")
-                    if (textSidecar.exists() && runCatching { textSidecar.readText(Charsets.UTF_8).lowercase().contains(query) }.getOrDefault(false)) return@filter true
+                    if (textSidecar.exists() && runCatching { normalizeSearch(textSidecar.readText(Charsets.UTF_8)).contains(query) }.getOrDefault(false)) return@filter true
                     val analysis = AiMetadataStore.load(file)
-                    analysis != null && normalizeSearch(listOf(analysis.title, analysis.summary, analysis.category, analysis.fields.values.joinToString(" ")).joinToString(" ")).contains(normalizeSearch(query))
+                    analysis != null && normalizeSearch(listOf(analysis.title, analysis.summary, analysis.category, analysis.fields.values.joinToString(" ")).joinToString(" ")).contains(query)
                 }
             }
             if (isFinishing || isDestroyed) return@launch
