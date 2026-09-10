@@ -108,6 +108,33 @@ class AiDocumentAnalyzerTest {
         }
     }
 
+    @Test
+    fun localAnalysisHandlesCurrencyBeforeAmountAndDashedPageMarkers() {
+        val root = Files.createTempDirectory("pocketscan-ai-currency").toFile()
+        try {
+            val pdf = File(root, "invoice.pdf").apply { writeText("pdf") }
+            val text = """
+                ----- PÁGINA 2 -----
+                Factura
+                Proveedor: Global Services
+                Subtotal: USD 125.50
+                IVA: 10 %
+                Total: $ 138.05
+            """.trimIndent()
+
+            val analysis = invokeLocalAnalysis(pdf, text)
+
+            assertEquals("125.50", analysis.fields["subtotal"])
+            assertEquals("138.05", analysis.fields["total"])
+            assertEquals("USD", analysis.fields["moneda"])
+            assertEquals("10 %", analysis.fields["iva"])
+            assertFalse(analysis.title.contains("PÁGINA", ignoreCase = true))
+            assertFalse(analysis.summary.contains("PÁGINA", ignoreCase = true))
+        } finally {
+            root.deleteRecursively()
+        }
+    }
+
     @Suppress("UNCHECKED_CAST")
     private fun invokeLocalAnalysis(file: File, text: String): AiDocumentAnalyzer.Analysis {
         val method = AiDocumentAnalyzer::class.java.getDeclaredMethod("localAnalysis", File::class.java, String::class.java)
