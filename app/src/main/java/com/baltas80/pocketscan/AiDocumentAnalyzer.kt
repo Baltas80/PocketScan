@@ -140,7 +140,8 @@ object AiDocumentAnalyzer {
                     it.any(Char::isLetter) &&
                     it.count(Char::isDigit) < it.length / 2 &&
                     !it.equals(type, true) &&
-                    !isOcrMarkerLine(it)
+                    !isOcrMarkerLine(it) &&
+                    !isGenericHeaderLine(it)
             }
         val title = usefulLine
             ?.replace(Regex("\\s+"), " ")
@@ -157,6 +158,15 @@ object AiDocumentAnalyzer {
         firstMatch(text, Regex("(?i)\\b(?:iva|vat|tva|mwst)\\s*[:=]?\\s*([0-9.,]+\\s*%?)"))?.let { fields["iva"] = it }
         firstMatch(text, Regex("(?i)\\b(?:fecha|date|datum|data)\\s*[:.-]?\\s*(\\d{1,2}[/-]\\d{1,2}[/-]\\d{2,4})"))?.let { fields["fecha"] = it }
         firstMatch(text, Regex("(?i)\\b(?:nif|cif|nie|vat|tax id)\\s*[:.-]?\\s*([A-Z]?[0-9]{7,9}[A-Z]?)"))?.let { fields["nif_cif"] = it }
+        firstMatch(text, Regex("(?i)\\b(?:n[uú]mero|nº|n°|num(?:ero)?|no\\.?|referencia|ref\\.?|expediente)\\s*[:#.-]?\\s*([A-Z0-9][A-Z0-9./_-]{2,30})"))?.let { fields["numero"] = it }
+        firstMatch(text, Regex("(?i)\\b(?:vencimiento|fecha de vencimiento|due date|f\\.? venc\\.?)\\s*[:.-]?\\s*(\\d{1,2}[/-]\\d{1,2}[/-]\\d{2,4})"))?.let { fields["vencimiento"] = it }
+        firstMatch(text, Regex("(?i)\\b(?:subtotal|base imponible|base)\\s*[:=]?\\s*([0-9][0-9.,]*)\\s*(€|EUR|USD|\\$|GBP|£)?"))?.let { fields["subtotal"] = it }
+        firstMatch(text, Regex("(?i)\\b(?:periodo|per[ií]odo|ejercicio|campaign|campa[nñ]a)\\s*[:.-]?\\s*([^\\n]{2,60})"))?.let { fields["periodo"] = cleanField(it) }
+        firstMatch(text, Regex("(?i)\\b(?:tel[eé]fono|tel\\.?|phone|telephone)\\s*[:.-]?\\s*([+0-9][0-9 ()-]{6,24})"))?.let { fields["telefono"] = cleanField(it) }
+        firstMatch(text, Regex("(?i)\\b(?:direcci[oó]n|domicilio|address)\\s*[:.-]?\\s*([^\\n]{4,100})"))?.let { fields["direccion"] = cleanField(it) }
+        firstMatch(text, Regex("(?i)\\b(?:concepto|asunto|motivo|description|descripci[oó]n)\\s*[:.-]?\\s*([^\\n]{3,120})"))?.let { fields["concepto"] = cleanField(it) }
+        firstMatch(text, Regex("(?i)\\b(?:proveedor|emisor|empresa|entidad)\\s*[:.-]?\\s*([^\\n]{3,100})"))?.let { fields["proveedor"] = cleanField(it) }
+        firstMatch(text, Regex("(?i)\\b(?:cliente|destinatario|beneficiario|titular)\\s*[:.-]?\\s*([^\\n]{3,100})"))?.let { fields["cliente"] = cleanField(it) }
 
         val summary = if (text.isBlank()) {
             "No OCR disponible para un análisis local más preciso."
@@ -172,9 +182,20 @@ object AiDocumentAnalyzer {
         return Analysis(category, title, summary, fields)
     }
 
+    private fun cleanField(value: String): String =
+        value.replace(Regex("\\s+"), " ").trim().trim('.', ':', ';', '-')
+
     private fun isOcrMarkerLine(line: String): Boolean =
         line.matches(Regex("(?i)^=+\\s*p[áa]gina\\s+\\d+\\s*=+$")) ||
             line.matches(Regex("(?i)^-+\\s*p[áa]gina\\s+\\d+\\s*-+$"))
+
+    private fun isGenericHeaderLine(line: String): Boolean {
+        val normalized = line.lowercase(Locale.ROOT).replace(Regex("[^a-záéíóúüñ ]"), " ").replace(Regex("\\s+"), " ").trim()
+        return normalized in setOf(
+            "ministerio", "ministerio de inclusion", "seguridad social", "seguridad ciudadana",
+            "documento", "pagina", "servicio", "secretaria de estado", "renta de la seguridad social y pensiones"
+        )
+    }
 
     private fun firstMatch(text: String, regex: Regex): String? =
         regex.find(text)?.groupValues?.getOrNull(1)?.trim()?.takeIf { it.isNotEmpty() }
