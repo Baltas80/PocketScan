@@ -61,14 +61,6 @@
                 android:minHeight="48dp"
                 android:layout_marginStart="6dp"
                 android:text="Preguntar" />
-            <Button
-                android:id="@+id/viewerCorrectOcr"
-                android:layout_width="0dp"
-                android:layout_height="wrap_content"
-                android:layout_weight="1"
-                android:minHeight="48dp"
-                android:layout_marginStart="6dp"
-                android:text="Corregir OCR" />
         </LinearLayout>
 
         <LinearLayout
@@ -76,21 +68,28 @@
             android:layout_height="wrap_content"
             android:orientation="horizontal">
             <Button
+                android:id="@+id/viewerCorrectOcr"
+                android:layout_width="0dp"
+                android:layout_height="wrap_content"
+                android:layout_weight="1"
+                android:minHeight="48dp"
+                android:text="Corregir OCR" />
+            <Button
                 android:id="@+id/viewerExportText"
                 android:layout_width="0dp"
                 android:layout_height="wrap_content"
                 android:layout_weight="1"
                 android:minHeight="48dp"
-                android:text="Exportar TXT" />
-            <Button
-                android:id="@+id/viewerShare"
-                android:layout_width="0dp"
-                android:layout_height="wrap_content"
-                android:layout_weight="1"
-                android:minHeight="48dp"
                 android:layout_marginStart="6dp"
-                android:text="Compartir PDF" />
+                android:text="Exportar TXT" />
         </LinearLayout>
+
+        <Button
+            android:id="@+id/viewerShare"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:minHeight="48dp"
+            android:text="Compartir PDF" />
     </LinearLayout>
 
     <androidx.recyclerview.widget.RecyclerView
