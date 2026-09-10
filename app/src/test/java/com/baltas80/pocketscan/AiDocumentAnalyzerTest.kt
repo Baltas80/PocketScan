@@ -135,6 +135,55 @@ class AiDocumentAnalyzerTest {
         }
     }
 
+    @Test
+    fun multilingualOcrKeepsStrongLatinDocumentOverTinyNonLatinFragment() {
+        val selected = invokeOcrSelection(
+            candidate("latin", "Factura ACME Servicios SL Total 1.493,75 EUR Cliente Juan Pérez"),
+            candidate("korean", "문서")
+        )
+
+        assertEquals("latin", selectedName(selected))
+    }
+
+    @Test
+    fun multilingualOcrUsesStrongNonLatinDocumentWhenLatinIsOnlyNoise() {
+        val selected = invokeOcrSelection(
+            candidate("latin", "ab"),
+            candidate("japanese", "請求書 株式会社 料金")
+        )
+
+        assertEquals("japanese", selectedName(selected))
+    }
+
+    @Test
+    fun multilingualOcrFallsBackToBestQualityCandidateWithoutStrongScript() {
+        val selected = invokeOcrSelection(
+            candidate("latin", "short"),
+            candidate("korean", "12 34")
+        )
+
+        assertEquals("latin", selectedName(selected))
+    }
+
+    private fun candidate(name: String, text: String): Any {
+        val candidateClass = Class.forName("com.baltas80.pocketscan.MultilingualOcr\\$Candidate")
+        val constructor = candidateClass.getDeclaredConstructor(String::class.java, String::class.java)
+        constructor.isAccessible = true
+        return constructor.newInstance(name, text)
+    }
+
+    private fun invokeOcrSelection(vararg candidates: Any): Any {
+        val method = MultilingualOcr::class.java.getDeclaredMethod("selectCandidate", List::class.java)
+        method.isAccessible = true
+        return method.invoke(MultilingualOcr, candidates.toList())!!
+    }
+
+    private fun selectedName(candidate: Any): String {
+        val field = candidate.javaClass.getDeclaredField("name")
+        field.isAccessible = true
+        return field.get(candidate) as String
+    }
+
     @Suppress("UNCHECKED_CAST")
     private fun invokeLocalAnalysis(file: File, text: String): AiDocumentAnalyzer.Analysis {
         val method = AiDocumentAnalyzer::class.java.getDeclaredMethod("localAnalysis", File::class.java, String::class.java)
