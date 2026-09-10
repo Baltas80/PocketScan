@@ -3,6 +3,10 @@
     <string name="app_name">PocketScan</string>
     <string name="tagline">Scannen. Verbessern. Speichern. Teilen.</string>
     <string name="home_headline">Alle deine Dokumente an einem Ort</string>
+    <string name="home_description">Scanne Belege, Rechnungen und Dokumente. PocketScan bewahrt sie auf und hilft dir, sie schnell zu finden.</string>
+    <string name="home_features_title">Alles, was du brauchst</string>
+    <string name="home_features">• Schnelles, präzises Scannen\n• Intelligente Informationserfassung\n• Suche nach Text, OCR, Kategorie, Datum und Betrag\n• Automatische Organisation nach Kategorien\n• Datenschutz und biometrische Sperre</string>
+    <string name="home_privacy">Deine Dokumente bleiben unter deiner Kontrolle.</string>
     <string name="scan_document">Dokument scannen</string>
     <string name="my_documents">Meine Dokumente</string>
     <string name="all_categories">Alle</string>
