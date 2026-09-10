@@ -91,7 +91,7 @@ class DocumentsActivity : AppCompatActivity() {
                     analysis != null && normalizeSearch(listOf(analysis.title, analysis.summary, analysis.category, analysis.fields.values.joinToString(" ")).joinToString(" ")).contains(query)
                 }
             }
-            if (isFinishing || isDestroyed || !kotlinx.coroutines.currentCoroutineContext().isActive) return@launch
+            if (isFinishing || isDestroyed) return@launch
             documents.clear(); documents.addAll(filtered); adapter.notifyDataSetChanged()
         }
     }
