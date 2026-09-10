@@ -1,0 +1,11 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <color name="pocketscan_blue">#146EF5</color>
+    <color name="pocketscan_blue_dark">#0B3D91</color>
+    <color name="pocketscan_blue_soft">#EAF2FF</color>
+    <color name="pocketscan_text">#14213D</color>
+    <color name="pocketscan_muted">#64748B</color>
+    <color name="pocketscan_surface">#FFFFFF</color>
+    <color name="pocketscan_background">#F6F8FC</color>
+    <color name="pocketscan_success">#1FA774</color>
+</resources>
