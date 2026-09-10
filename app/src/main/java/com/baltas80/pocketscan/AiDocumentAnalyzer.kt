@@ -31,33 +31,35 @@ object AiDocumentAnalyzer {
         val source: String = "local"
     )
 
-    private val documentSchema = Schema.obj(
-        mapOf(
-            "category" to Schema.enumeration(
-                listOf("FACTURAS", "PRESUPUESTOS", "CONTRATOS", "RECIBOS", "TICKETS", "NOMINAS", "CERTIFICADOS", "INFORMES", "CITAS", "GENERAL")
+    private val documentSchema: Schema by lazy {
+        Schema.obj(
+            mapOf(
+                "category" to Schema.enumeration(
+                    listOf("FACTURAS", "PRESUPUESTOS", "CONTRATOS", "RECIBOS", "TICKETS", "NOMINAS", "CERTIFICADOS", "INFORMES", "CITAS", "GENERAL")
+                ),
+                "title" to Schema.string(),
+                "summary" to Schema.string(),
+                "proveedor" to Schema.string(),
+                "cliente" to Schema.string(),
+                "nif_cif" to Schema.string(),
+                "numero" to Schema.string(),
+                "fecha" to Schema.string(),
+                "vencimiento" to Schema.string(),
+                "subtotal" to Schema.string(),
+                "iva" to Schema.string(),
+                "total" to Schema.string(),
+                "moneda" to Schema.string(),
+                "periodo" to Schema.string(),
+                "direccion" to Schema.string(),
+                "telefono" to Schema.string(),
+                "concepto" to Schema.string()
             ),
-            "title" to Schema.string(),
-            "summary" to Schema.string(),
-            "proveedor" to Schema.string(),
-            "cliente" to Schema.string(),
-            "nif_cif" to Schema.string(),
-            "numero" to Schema.string(),
-            "fecha" to Schema.string(),
-            "vencimiento" to Schema.string(),
-            "subtotal" to Schema.string(),
-            "iva" to Schema.string(),
-            "total" to Schema.string(),
-            "moneda" to Schema.string(),
-            "periodo" to Schema.string(),
-            "direccion" to Schema.string(),
-            "telefono" to Schema.string(),
-            "concepto" to Schema.string()
-        ),
-        optionalProperties = listOf(
-            "proveedor", "cliente", "nif_cif", "numero", "fecha", "vencimiento",
-            "subtotal", "iva", "total", "moneda", "periodo", "direccion", "telefono", "concepto"
+            optionalProperties = listOf(
+                "proveedor", "cliente", "nif_cif", "numero", "fecha", "vencimiento",
+                "subtotal", "iva", "total", "moneda", "periodo", "direccion", "telefono", "concepto"
+            )
         )
-    )
+    }
 
     suspend fun analyze(file: File, ocrText: String = ""): Result<Analysis> = withContext(Dispatchers.IO) {
         runCatching {
