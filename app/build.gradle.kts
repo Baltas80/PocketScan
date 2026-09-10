@@ -22,7 +22,7 @@ android {
     buildTypes {
         release {
             isMinifyEnabled = false
-            proguardFiles(getDefaultProguardFile("proguard-android-optimize.txt"), "proguard-rules.pro")
+            proguardFiles(getDefaultProguardFile("proguard-android-optimize.txt"), "proguard-android-optimize.txt")
         }
     }
 
@@ -65,4 +65,5 @@ dependencies {
     debugImplementation("com.google.firebase:firebase-appcheck-debug")
 
     testImplementation("junit:junit:4.13.2")
+    testImplementation("org.json:json:20250517")
 }
