@@ -26,7 +26,7 @@ object AiLibraryQueryEngine {
         "de", "del", "la", "el", "los", "las", "un", "una", "y", "en", "por", "para", "con",
         "que", "me", "mis", "mi", "a", "al", "the", "of", "and", "in", "for", "with", "what",
         "which", "how", "much", "many", "show", "list", "find", "total", "suma", "sum", "cuanto",
-        "cuánto", "cuantas", "cuántas", "dime", "muestra", "buscar", "encuentra", "quiero", "hay"
+        "cuántas", "cuantas", "dime", "muestra", "buscar", "encuentra", "quiero", "hay"
     )
 
     private val categoryAliases = mapOf(
@@ -43,10 +43,10 @@ object AiLibraryQueryEngine {
 
     fun query(query: String, documents: List<File>): Result {
         val normalizedQuery = normalize(query)
-        val tokens = normalizedQuery.split(Regex("\\s+"))
+        val tokens = normalizedQuery.split(Regex("[^a-z0-9]+"))
             .filter { it.length > 1 && it !in stopWords }
         val category = categoryAliases.entries.firstOrNull { (_, aliases) ->
-            aliases.any { alias -> normalizedQuery.contains(normalize(alias)) }
+            aliases.any { alias -> containsWord(normalizedQuery, normalize(alias)) }
         }?.key
         val amountFilter = parseAmountFilter(normalizedQuery)
         val year = Regex("\\b20\\d{2}\\b").find(normalizedQuery)?.value?.toIntOrNull()
@@ -60,7 +60,7 @@ object AiLibraryQueryEngine {
                 val yearOk = year == null || extractYear(analysis?.fields?.get("fecha")) == year
                 val amount = extractAmount(analysis?.fields?.get("total"))
                 val amountOk = amountFilter == null || amountFilter.matches(amount)
-                val lexicalScore = tokens.count { token -> corpus.contains(token) }
+                val lexicalScore = tokens.count { token -> containsWord(corpus, token) }
                 val hasStructuredFilter = category != null || year != null || amountFilter != null
                 categoryOk && yearOk && amountOk && (tokens.isEmpty() || lexicalScore > 0 || hasStructuredFilter)
             }
@@ -119,7 +119,7 @@ object AiLibraryQueryEngine {
     }
 
     private fun parseAmountFilter(query: String): AmountFilter? {
-        val number = "([0-9]{1,3}(?:\\.[0-9]{3})*(?:,[0-9]{1,2})?|[0-9]+(?:[.,][0-9]{1,2})?)"
+        val number = "([0-9]{1,3}(?:[.\\s][0-9]{3})*(?:,[0-9]{1,2})?|[0-9]+(?:[.,][0-9]{1,2})?)"
         val phraseRegex = Regex(
             "\\b(al menos|como mínimo|como minimo|at least|mayor o igual que|greater than or equal to|" +
                 "más de|mas de|mayor que|mayor|superior|greater than|over|above|" +
@@ -178,7 +178,7 @@ object AiLibraryQueryEngine {
     private fun extractAmount(value: String?): Pair<Double, String>? {
         if (value.isNullOrBlank()) return null
         val cleaned = value.trim().replace("€", " EUR", true)
-        val match = Regex("[+-]?[0-9][0-9.,]*").find(cleaned) ?: return null
+        val match = Regex("[+-]?[0-9][0-9.,\\s]*").find(cleaned) ?: return null
         val number = parseNumber(match.value) ?: return null
         val currency = when {
             cleaned.contains("eur", true) -> "EUR"
@@ -190,7 +190,7 @@ object AiLibraryQueryEngine {
     }
 
     private fun parseNumber(value: String): Double? {
-        val s = value.replace(" ", "")
+        val s = value.replace("\\s".toRegex(), "")
         return runCatching {
             when {
                 s.contains(',') && s.contains('.') -> {
@@ -218,6 +218,11 @@ object AiLibraryQueryEngine {
     private fun normalize(value: String): String = Normalizer.normalize(value.lowercase(Locale.ROOT), Normalizer.Form.NFD)
         .replace("\\p{M}+".toRegex(), "")
         .replace("ñ", "n")
+
+    private fun containsWord(text: String, word: String): Boolean {
+        if (word.isBlank()) return false
+        return Regex("(?:^|[^a-z0-9])${Regex.escape(word)}(?:$|[^a-z0-9])").containsMatchIn(text)
+    }
 
     private fun formatAmount(value: Double): String = "%.2f".format(Locale.US, value)
 }
