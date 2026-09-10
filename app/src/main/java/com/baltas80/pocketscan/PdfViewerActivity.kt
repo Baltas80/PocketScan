@@ -12,7 +12,6 @@ import android.view.ViewGroup
 import android.widget.Button
 import android.widget.EditText
 import android.widget.TextView
-import android.widget.Toast
 import androidx.activity.result.contract.ActivityResultContracts.CreateDocument
 import androidx.appcompat.app.AlertDialog
 import androidx.appcompat.app.AppCompatActivity
@@ -20,6 +19,7 @@ import androidx.core.content.FileProvider
 import androidx.lifecycle.lifecycleScope
 import androidx.recyclerview.widget.LinearLayoutManager
 import androidx.recyclerview.widget.RecyclerView
+import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.launch
@@ -113,11 +113,7 @@ class PdfViewerActivity : AppCompatActivity() {
                 val baseName = pdfFile.nameWithoutExtension.ifBlank { "documento" }
                 correctedTextExportLauncher.launch("$baseName-corregido.txt")
             } catch (error: Throwable) {
-                Toast.makeText(
-                    this@PdfViewerActivity,
-                    error.message ?: "No se pudo corregir el OCR",
-                    Toast.LENGTH_LONG
-                ).show()
+                Toast.makeText(this@PdfViewerActivity, error.message ?: "No se pudo corregir el OCR", Toast.LENGTH_LONG).show()
             } finally {
                 button.isEnabled = true
             }
@@ -138,11 +134,7 @@ class PdfViewerActivity : AppCompatActivity() {
                 } ?: false
             }.getOrDefault(false)
             withContext(Dispatchers.Main) {
-                Toast.makeText(
-                    this@PdfViewerActivity,
-                    if (success) "Texto exportado correctamente" else "No se pudo exportar el texto",
-                    Toast.LENGTH_LONG
-                ).show()
+                Toast.makeText(this@PdfViewerActivity, if (success) "Texto exportado correctamente" else "No se pudo exportar el texto", Toast.LENGTH_LONG).show()
             }
         }
     }
@@ -162,58 +154,25 @@ class PdfViewerActivity : AppCompatActivity() {
                     if (analysis.summary.isNotBlank()) append("Resumen:\n${analysis.summary}\n\n")
                     if (fields.isNotBlank()) append("Datos extraídos:\n$fields")
                 }
-                AlertDialog.Builder(this@PdfViewerActivity)
-                    .setTitle("Análisis inteligente")
-                    .setMessage(message)
-                    .setPositiveButton(android.R.string.ok, null)
-                    .show()
-            }.onFailure { error ->
-                Toast.makeText(this@PdfViewerActivity, error.message ?: "No se pudo analizar el documento", Toast.LENGTH_LONG).show()
-            }
+                AlertDialog.Builder(this@PdfViewerActivity).setTitle("Análisis inteligente").setMessage(message).setPositiveButton(android.R.string.ok, null).show()
+            }.onFailure { error -> Toast.makeText(this@PdfViewerActivity, error.message ?: "No se pudo analizar el documento", Toast.LENGTH_LONG).show() }
         }
     }
 
     private fun askAboutDocument() {
-        val input = EditText(this).apply {
-            hint = "Ej.: ¿Cuál es el importe total?"
-            setSingleLine(false)
-            minLines = 2
-            maxLines = 4
-        }
-        val answer = TextView(this).apply {
-            text = "La respuesta aparecerá aquí."
-            setTextIsSelectable(true)
-            setPadding(0, 16, 0, 0)
-        }
-        val container = android.widget.LinearLayout(this).apply {
-            orientation = android.widget.LinearLayout.VERTICAL
-            setPadding(24, 8, 24, 8)
-            addView(input, android.widget.LinearLayout.LayoutParams(-1, -2))
-            addView(answer, android.widget.LinearLayout.LayoutParams(-1, -2))
-        }
-        val dialog = AlertDialog.Builder(this)
-            .setTitle("Preguntar sobre este documento")
-            .setView(container)
-            .setNegativeButton(android.R.string.cancel, null)
-            .setPositiveButton("Preguntar", null)
-            .create()
+        val input = EditText(this).apply { hint = "Ej.: ¿Cuál es el importe total?"; setSingleLine(false); minLines = 2; maxLines = 4 }
+        val answer = TextView(this).apply { text = "La respuesta aparecerá aquí."; setTextIsSelectable(true); setPadding(0, 16, 0, 0) }
+        val container = android.widget.LinearLayout(this).apply { orientation = android.widget.LinearLayout.VERTICAL; setPadding(24, 8, 24, 8); addView(input, android.widget.LinearLayout.LayoutParams(-1, -2)); addView(answer, android.widget.LinearLayout.LayoutParams(-1, -2)) }
+        val dialog = AlertDialog.Builder(this).setTitle("Preguntar sobre este documento").setView(container).setNegativeButton(android.R.string.cancel, null).setPositiveButton("Preguntar", null).create()
         dialog.setOnShowListener {
             dialog.getButton(AlertDialog.BUTTON_POSITIVE).setOnClickListener {
                 val question = input.text.toString().trim()
-                if (question.isBlank()) {
-                    input.error = "Escribe una pregunta"
-                    return@setOnClickListener
-                }
+                if (question.isBlank()) { input.error = "Escribe una pregunta"; return@setOnClickListener }
                 val button = dialog.getButton(AlertDialog.BUTTON_POSITIVE)
                 button.isEnabled = false
                 answer.text = "Analizando el documento…\n"
                 lifecycleScope.launch {
-                    runCatching {
-                        AiPdfAssistant.answerStream(pdfFile, withContext(Dispatchers.IO) { readOcr() }, question)
-                            .collect { chunk -> answer.append(chunk) }
-                    }.onFailure {
-                        answer.append("\n\nNo se pudo completar la consulta: ${it.message ?: "error de IA"}")
-                    }
+                    runCatching { AiPdfAssistant.answerStream(pdfFile, withContext(Dispatchers.IO) { readOcr() }, question).collect { chunk -> answer.append(chunk) } }.onFailure { answer.append("\n\nNo se pudo completar la consulta: ${it.message ?: "error de IA"}") }
                     button.isEnabled = true
                 }
             }
@@ -221,19 +180,11 @@ class PdfViewerActivity : AppCompatActivity() {
         dialog.show()
     }
 
-    private fun countPages(): Int = runCatching {
-        ParcelFileDescriptor.open(pdfFile, ParcelFileDescriptor.MODE_READ_ONLY).use { descriptor ->
-            PdfRenderer(descriptor).use { it.pageCount }
-        }
-    }.getOrDefault(0)
+    private fun countPages(): Int = runCatching { ParcelFileDescriptor.open(pdfFile, ParcelFileDescriptor.MODE_READ_ONLY).use { descriptor -> PdfRenderer(descriptor).use { it.pageCount } } }.getOrDefault(0)
 
     private fun shareDocument() {
         val uri = FileProvider.getUriForFile(this, "${packageName}.fileprovider", pdfFile)
-        val intent = Intent(Intent.ACTION_SEND).apply {
-            type = "application/pdf"
-            putExtra(Intent.EXTRA_STREAM, uri)
-            addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
-        }
+        val intent = Intent(Intent.ACTION_SEND).apply { type = "application/pdf"; putExtra(Intent.EXTRA_STREAM, uri); addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION) }
         startActivity(Intent.createChooser(intent, getString(R.string.share_document)))
     }
 
@@ -245,8 +196,7 @@ private class PdfPageAdapter(
     private val pageCount: Int,
     private val scope: CoroutineScope
 ) : RecyclerView.Adapter<PdfPageAdapter.PageHolder>() {
-    override fun onCreateViewHolder(parent: ViewGroup, viewType: Int): PageHolder =
-        PageHolder(LayoutInflater.from(parent.context).inflate(R.layout.item_pdf_page, parent, false))
+    override fun onCreateViewHolder(parent: ViewGroup, viewType: Int): PageHolder = PageHolder(LayoutInflater.from(parent.context).inflate(R.layout.item_pdf_page, parent, false))
     override fun getItemCount(): Int = pageCount
     override fun onBindViewHolder(holder: PageHolder, position: Int) { holder.bind(file, position, scope) }
     override fun onViewRecycled(holder: PageHolder) { holder.clear(); super.onViewRecycled(holder) }
@@ -266,10 +216,7 @@ private class PdfPageAdapter(
             renderJob = scope.launch(Dispatchers.IO) {
                 val rendered = render(file, pageIndex, image.resources.displayMetrics.widthPixels)
                 withContext(Dispatchers.Main) {
-                    if (generation == currentGeneration && rendered != null) {
-                        bitmap = rendered
-                        image.setImageBitmap(rendered)
-                    } else rendered?.recycle()
+                    if (generation == currentGeneration && rendered != null) { bitmap = rendered; image.setImageBitmap(rendered) } else rendered?.recycle()
                 }
             }
         }
@@ -290,9 +237,7 @@ private class PdfPageAdapter(
                         val width = targetWidth.coerceIn(480, 1400)
                         val ratio = page.height.toFloat() / page.width.toFloat()
                         val height = (width * ratio).toInt().coerceAtLeast(1)
-                        Bitmap.createBitmap(width, height, Bitmap.Config.ARGB_8888).also {
-                            page.render(it, null, null, PdfRenderer.Page.RENDER_MODE_FOR_DISPLAY)
-                        }
+                        Bitmap.createBitmap(width, height, Bitmap.Config.ARGB_8888).also { page.render(it, null, null, PdfRenderer.Page.RENDER_MODE_FOR_DISPLAY) }
                     }
                 }
             }
