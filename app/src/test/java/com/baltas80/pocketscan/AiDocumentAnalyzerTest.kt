@@ -9,6 +9,20 @@ import java.nio.file.Files
 
 class AiDocumentAnalyzerTest {
     @Test
+    fun categoryClassifierRecognizesExactSpanishInvoiceOcr() {
+        val text = """
+            ===== PÁGINA 1 =====
+            MINISTERIO
+            Factura
+            ACME Servicios SL
+            Proveedor: ACME Servicios SL
+            Total: 1.493,75 €
+        """.trimIndent()
+
+        assertEquals(DocumentOrganizer.FACTURAS, DocumentOrganizer.categoryForText(text))
+    }
+
+    @Test
     fun localAnalysisExtractsStructuredSpanishInvoiceFields() {
         val root = Files.createTempDirectory("pocketscan-ai").toFile()
         try {
