@@ -95,16 +95,19 @@ object AiDocumentAnalyzer {
         val title = usefulLine?.replace(Regex("\\s+"), " ")?.take(70)?.ifBlank { "$type - ${file.nameWithoutExtension}" } ?: "$type - ${file.nameWithoutExtension}"
 
         val fields = linkedMapOf<String, String>()
-        firstMatchGroups(text, Regex("(?i)\\b(?:total|importe total|total amount|montant total|gesamtbetrag|totale)\\s*[:=]?\\s*([0-9][0-9.,]*)\\s*(€|EUR|USD|\\$|GBP|£)?"))?.let { match ->
+        firstMatchGroups(text, Regex("(?i)\\b(?:total|importe total|total amount|montant total|gesamtbetrag|totale)\\s*[:=]?\\s*(?:(€|EUR|USD|\\$|GBP|£)\\s*)?([0-9][0-9.,]*)"))?.let { match ->
             fields["total"] = match.value
             match.currency?.let { fields["moneda"] = normalizeCurrency(it) }
         }
-        firstMatch(text, Regex("(?i)\\b(?:iva|vat|tva|mwst)\\s*[:=]?\\s*([0-9.,]+\\s*%?)"))?.let { fields["iva"] = it }
-        firstMatch(text, Regex("(?i)\\b(?:fecha|date|datum|data)\\s*[:.-]?\\s*(\\d{1,4}[/-]\\d{1,2}[/-]\\d{1,4})"))?.let { fields["fecha"] = it }
-        firstMatch(text, Regex("(?i)\\b(?:nif|cif|nie|vat|tax id)\\s*[:.-]?\\s*([A-Z]?[0-9]{7,9}[A-Z]?)"))?.let { fields["nif_cif"] = it }
+        firstMatch(text, Regex("(?i)\\b(?:iva|vat|tva|mwst)\\s*[:=]?\\s*([0-9]+(?:[.,][0-9]+)?\\s*%?)"))?.let { fields["iva"] = cleanField(it) }
+        firstMatch(text, Regex("(?i)\\b(?:fecha|date|datum|data)\\s*[:.-]?\\s*(\\d{1,4}[./-]\\d{1,2}[./-]\\d{1,4})"))?.let { fields["fecha"] = it }
+        firstMatch(text, Regex("(?i)\\b(?:nif|cif|nie|vat|tax id)\\s*[:.-]?\\s*((?:[A-Z]{1,3})?[0-9]{7,12}[A-Z]?)"))?.let { fields["nif_cif"] = it }
         firstMatch(text, Regex("(?i)\\b(?:n[uú]mero|nº|n°|num(?:ero)?|no\\.?|referencia|ref\\.?|expediente)\\s*[:#.-]?\\s*([A-Z0-9][A-Z0-9./_-]{2,30})"))?.let { fields["numero"] = it }
-        firstMatch(text, Regex("(?i)\\b(?:vencimiento|fecha de vencimiento|due date|f\\.? venc\\.?)\\s*[:.-]?\\s*(\\d{1,4}[/-]\\d{1,2}[/-]\\d{1,4})"))?.let { fields["vencimiento"] = it }
-        firstMatchGroups(text, Regex("(?i)\\b(?:subtotal|base imponible|base)\\s*[:=]?\\s*([0-9][0-9.,]*)\\s*(€|EUR|USD|\\$|GBP|£)?"))?.let { match -> fields["subtotal"] = match.value }
+        firstMatch(text, Regex("(?i)\\b(?:vencimiento|fecha de vencimiento|due date|f\\.? venc\\.?)\\s*[:.-]?\\s*(\\d{1,4}[./-]\\d{1,2}[./-]\\d{1,4})"))?.let { fields["vencimiento"] = it }
+        firstMatchGroups(text, Regex("(?i)\\b(?:subtotal|base imponible|base)\\s*[:=]?\\s*(?:(€|EUR|USD|\\$|GBP|£)\\s*)?([0-9][0-9.,]*)"))?.let { match ->
+            fields["subtotal"] = match.value
+            if (!fields.containsKey("moneda")) match.currency?.let { fields["moneda"] = normalizeCurrency(it) }
+        }
         firstMatch(text, Regex("(?i)\\b(?:periodo|per[ií]odo|ejercicio|campaign|campa[nñ]a)\\s*[:.-]?\\s*([^\\n]{2,60})"))?.let { fields["periodo"] = cleanField(it) }
         firstMatch(text, Regex("(?i)\\b(?:tel[eé]fono|tel\\.?|phone|telephone)\\s*[:.-]?\\s*([+0-9][0-9 ()-]{6,24})"))?.let { fields["telefono"] = cleanField(it) }
         firstMatch(text, Regex("(?i)\\b(?:direcci[oó]n|domicilio|address)\\s*[:.-]?\\s*([^\\n]{4,100})"))?.let { fields["direccion"] = cleanField(it) }
@@ -118,8 +121,8 @@ object AiDocumentAnalyzer {
 
     private data class Match(val value: String, val currency: String?)
     private fun firstMatchGroups(text: String, regex: Regex): Match? = regex.find(text)?.let { result ->
-        val value = result.groupValues.getOrNull(1)?.trim().orEmpty()
-        if (value.isBlank()) null else Match(value, result.groupValues.getOrNull(2)?.trim()?.takeIf { it.isNotEmpty() })
+        val value = result.groupValues.getOrNull(2)?.trim().orEmpty()
+        if (value.isBlank()) null else Match(value, result.groupValues.getOrNull(1)?.trim()?.takeIf { it.isNotEmpty() })
     }
 
     private fun cleanField(value: String): String = value.replace(Regex("\\s+"), " ").trim().trim('.', ':', ';', '-')
