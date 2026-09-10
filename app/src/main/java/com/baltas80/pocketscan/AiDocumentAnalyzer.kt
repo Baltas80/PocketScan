@@ -139,7 +139,8 @@ object AiDocumentAnalyzer {
                 it.length >= 4 &&
                     it.any(Char::isLetter) &&
                     it.count(Char::isDigit) < it.length / 2 &&
-                    !it.equals(type, true)
+                    !it.equals(type, true) &&
+                    !isOcrMarkerLine(it)
             }
         val title = usefulLine
             ?.replace(Regex("\\s+"), " ")
@@ -160,10 +161,20 @@ object AiDocumentAnalyzer {
         val summary = if (text.isBlank()) {
             "No OCR disponible para un análisis local más preciso."
         } else {
-            text.replace(Regex("\\s+"), " ").trim().take(700)
+            text.lineSequence()
+                .map { it.trim() }
+                .filter { it.isNotBlank() && !isOcrMarkerLine(it) }
+                .joinToString(" ")
+                .replace(Regex("\\s+"), " ")
+                .trim()
+                .take(700)
         }
         return Analysis(category, title, summary, fields)
     }
+
+    private fun isOcrMarkerLine(line: String): Boolean =
+        line.matches(Regex("(?i)^=+\\s*p[áa]gina\\s+\\d+\\s*=+$")) ||
+            line.matches(Regex("(?i)^-+\\s*p[áa]gina\\s+\\d+\\s*-+$"))
 
     private fun firstMatch(text: String, regex: Regex): String? =
         regex.find(text)?.groupValues?.getOrNull(1)?.trim()?.takeIf { it.isNotEmpty() }
