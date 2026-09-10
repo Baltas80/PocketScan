@@ -24,21 +24,24 @@ object DocumentOrganizer {
     fun categoryForText(text: String): String {
         val value = normalizeForClassification(text)
         return when {
-            value.contains("factura") || value.contains("factur4") || value.contains("invoice") -> FACTURAS
-            value.contains("presupuesto") || value.contains("quotation") || value.contains("estimate") -> PRESUPUESTOS
-            value.contains("contrato") || value.contains("contract") -> CONTRATOS
-            value.contains("recibo") || value.contains("receipt") -> RECIBOS
-            value.contains("ticket") || value.contains("tique") -> TICKETS
-            value.contains("nomina") || value.contains("payroll") -> NOMINAS
-            value.contains("certificado") || value.contains("certificate") -> CERTIFICADOS
-            value.contains("informe") || value.contains("report") -> INFORMES
-            value.contains("cita") || value.contains("appointment") -> CITAS
+            containsAny(value, "factura", "factur4", "invoice", "bill") -> FACTURAS
+            containsAny(value, "presupuesto", "quotation", "estimate", "quote") -> PRESUPUESTOS
+            containsAny(value, "contrato", "contract", "agreement") -> CONTRATOS
+            containsAny(value, "recibo", "receipt") -> RECIBOS
+            containsAny(value, "ticket", "tique") -> TICKETS
+            containsAny(value, "nomina", "payroll", "payslip", "salary slip") -> NOMINAS
+            containsAny(value, "certificado", "certificate") -> CERTIFICADOS
+            containsAny(value, "informe", "report") -> INFORMES
+            containsAny(value, "cita", "appointment") -> CITAS
             else -> GENERAL
         }
     }
 
+    private fun containsAny(value: String, vararg terms: String): Boolean =
+        terms.any { term -> value.contains(term) }
+
     private fun normalizeForClassification(text: String): String =
-        Normalizer.normalize(text, Normalizer.Form.NFD)
+        Normalizer.normalize(text, Normalizer.Form.NFKC)
             .replace("\\p{M}+".toRegex(), "")
             .replace("[\\u200B-\\u200D\\uFEFF]".toRegex(), "")
             .lowercase(Locale.ROOT)
