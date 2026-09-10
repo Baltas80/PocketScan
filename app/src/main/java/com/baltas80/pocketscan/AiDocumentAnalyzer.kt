@@ -34,30 +34,13 @@ object AiDocumentAnalyzer {
     private val documentSchema: Schema by lazy {
         Schema.obj(
             mapOf(
-                "category" to Schema.enumeration(
-                    listOf("FACTURAS", "PRESUPUESTOS", "CONTRATOS", "RECIBOS", "TICKETS", "NOMINAS", "CERTIFICADOS", "INFORMES", "CITAS", "GENERAL")
-                ),
-                "title" to Schema.string(),
-                "summary" to Schema.string(),
-                "proveedor" to Schema.string(),
-                "cliente" to Schema.string(),
-                "nif_cif" to Schema.string(),
-                "numero" to Schema.string(),
-                "fecha" to Schema.string(),
-                "vencimiento" to Schema.string(),
-                "subtotal" to Schema.string(),
-                "iva" to Schema.string(),
-                "total" to Schema.string(),
-                "moneda" to Schema.string(),
-                "periodo" to Schema.string(),
-                "direccion" to Schema.string(),
-                "telefono" to Schema.string(),
-                "concepto" to Schema.string()
+                "category" to Schema.enumeration(listOf("FACTURAS", "PRESUPUESTOS", "CONTRATOS", "RECIBOS", "TICKETS", "NOMINAS", "CERTIFICADOS", "INFORMES", "CITAS", "GENERAL")),
+                "title" to Schema.string(), "summary" to Schema.string(), "proveedor" to Schema.string(), "cliente" to Schema.string(),
+                "nif_cif" to Schema.string(), "numero" to Schema.string(), "fecha" to Schema.string(), "vencimiento" to Schema.string(),
+                "subtotal" to Schema.string(), "iva" to Schema.string(), "total" to Schema.string(), "moneda" to Schema.string(),
+                "periodo" to Schema.string(), "direccion" to Schema.string(), "telefono" to Schema.string(), "concepto" to Schema.string()
             ),
-            optionalProperties = listOf(
-                "proveedor", "cliente", "nif_cif", "numero", "fecha", "vencimiento",
-                "subtotal", "iva", "total", "moneda", "periodo", "direccion", "telefono", "concepto"
-            )
+            optionalProperties = listOf("proveedor", "cliente", "nif_cif", "numero", "fecha", "vencimiento", "subtotal", "iva", "total", "moneda", "periodo", "direccion", "telefono", "concepto")
         )
     }
 
@@ -70,25 +53,15 @@ object AiDocumentAnalyzer {
     }
 
     private suspend fun tryCloudAnalysis(file: File, ocrText: String): Result<Analysis> = runCatching {
-        require(file.length() <= MAX_INLINE_PDF_BYTES) {
-            "PDF demasiado grande para el análisis IA directo (${file.length() / 1_000_000} MB)."
-        }
-        val model: GenerativeModel = Firebase.ai(
-            backend = GenerativeBackend.googleAI(),
-            useLimitedUseAppCheckTokens = true
-        ).generativeModel(
+        require(file.length() <= MAX_INLINE_PDF_BYTES) { "PDF demasiado grande para el análisis IA directo (${file.length() / 1_000_000} MB)." }
+        val model: GenerativeModel = Firebase.ai(backend = GenerativeBackend.googleAI(), useLimitedUseAppCheckTokens = true).generativeModel(
             modelName = AiModelConfig.modelName(),
-            generationConfig = generationConfig {
-                responseMimeType = "application/json"
-                responseSchema = documentSchema
-            }
+            generationConfig = generationConfig { responseMimeType = "application/json"; responseSchema = documentSchema }
         )
-
         val auxiliaryOcr = ocrText.take(12000)
         val prompt = content {
             inlineData(file.readBytes(), "application/pdf")
-            text(
-                """
+            text("""
                 You are PocketScan's document intelligence engine. Analyze the complete PDF, including layout, tables and visible values. OCR text below is only auxiliary context.
                 Return the requested JSON schema. Never invent data. For absent fields, leave them empty.
                 Extract only data actually present in the document. Preserve exact amounts, dates, identifiers and names when readable.
@@ -97,70 +70,41 @@ object AiDocumentAnalyzer {
 
                 AUXILIARY OCR:
                 $auxiliaryOcr
-                """.trimIndent()
-            )
+            """.trimIndent())
         }
-
         val response = model.generateContent(prompt)
         val json = JSONObject(response.text ?: error("AI returned no content"))
         val fields = linkedMapOf<String, String>()
-        listOf(
-            "proveedor", "cliente", "nif_cif", "numero", "fecha", "vencimiento",
-            "subtotal", "iva", "total", "moneda", "periodo", "direccion", "telefono", "concepto"
-        ).forEach { key ->
+        listOf("proveedor", "cliente", "nif_cif", "numero", "fecha", "vencimiento", "subtotal", "iva", "total", "moneda", "periodo", "direccion", "telefono", "concepto").forEach { key ->
             json.optString(key).trim().takeIf { it.isNotEmpty() }?.let { fields[key] = it }
         }
-        Analysis(
-            normalizeCategory(json.optString("category")),
-            json.optString("title", "Document").ifBlank { "Document" },
-            json.optString("summary", "").trim(),
-            fields,
-            "gemini"
-        )
+        Analysis(normalizeCategory(json.optString("category")), json.optString("title", "Document").ifBlank { "Document" }, json.optString("summary", "").trim(), fields, "gemini")
     }
 
     private fun localAnalysis(file: File, text: String): Analysis {
         val category = DocumentOrganizer.categoryForText(text)
         val type = when (category) {
-            DocumentOrganizer.FACTURAS -> "Factura"
-            DocumentOrganizer.PRESUPUESTOS -> "Presupuesto"
-            DocumentOrganizer.CONTRATOS -> "Contrato"
-            DocumentOrganizer.RECIBOS -> "Recibo"
-            DocumentOrganizer.TICKETS -> "Ticket"
-            DocumentOrganizer.NOMINAS -> "Nómina"
-            DocumentOrganizer.CERTIFICADOS -> "Certificado"
-            DocumentOrganizer.INFORMES -> "Informe"
-            DocumentOrganizer.CITAS -> "Cita"
-            else -> "Documento"
+            DocumentOrganizer.FACTURAS -> "Factura"; DocumentOrganizer.PRESUPUESTOS -> "Presupuesto"; DocumentOrganizer.CONTRATOS -> "Contrato"
+            DocumentOrganizer.RECIBOS -> "Recibo"; DocumentOrganizer.TICKETS -> "Ticket"; DocumentOrganizer.NOMINAS -> "Nómina"
+            DocumentOrganizer.CERTIFICADOS -> "Certificado"; DocumentOrganizer.INFORMES -> "Informe"; DocumentOrganizer.CITAS -> "Cita"; else -> "Documento"
         }
-        val usefulLine = text.lineSequence()
-            .map { it.trim() }
-            .firstOrNull {
-                it.length >= 4 &&
-                    it.any(Char::isLetter) &&
-                    it.count(Char::isDigit) < it.length / 2 &&
-                    !it.equals(type, true) &&
-                    !isOcrMarkerLine(it) &&
-                    !isGenericHeaderLine(it)
-            }
-        val title = usefulLine
-            ?.replace(Regex("\\s+"), " ")
-            ?.take(70)
-            ?.ifBlank { "$type - ${file.nameWithoutExtension}" }
-            ?: "$type - ${file.nameWithoutExtension}"
+        val usefulLine = text.lineSequence().map { it.trim() }.firstOrNull {
+            it.length >= 4 && it.any(Char::isLetter) && it.count(Char::isDigit) < it.length / 2 &&
+                !it.equals(type, true) && !isOcrMarkerLine(it) && !isGenericHeaderLine(it)
+        }
+        val title = usefulLine?.replace(Regex("\\s+"), " ")?.take(70)?.ifBlank { "$type - ${file.nameWithoutExtension}" } ?: "$type - ${file.nameWithoutExtension}"
 
         val fields = linkedMapOf<String, String>()
-        firstMatch(text, Regex("(?i)\\b(?:total|importe total|total amount|montant total|gesamtbetrag|totale)\\s*[:=]?\\s*([0-9][0-9.,]*)\\s*(€|EUR|USD|\\$|GBP|£)?"))?.let { value ->
-            fields["total"] = value
-            val currency = Regex("(?i)(EUR|USD|GBP|€|\\$|£)").find(value)?.value.orEmpty()
-            if (currency.isNotBlank()) fields["moneda"] = normalizeCurrency(currency)
+        firstMatchGroups(text, Regex("(?i)\\b(?:total|importe total|total amount|montant total|gesamtbetrag|totale)\\s*[:=]?\\s*([0-9][0-9.,]*)\\s*(€|EUR|USD|\\$|GBP|£)?"))?.let { match ->
+            fields["total"] = match.value
+            match.currency?.let { fields["moneda"] = normalizeCurrency(it) }
         }
         firstMatch(text, Regex("(?i)\\b(?:iva|vat|tva|mwst)\\s*[:=]?\\s*([0-9.,]+\\s*%?)"))?.let { fields["iva"] = it }
-        firstMatch(text, Regex("(?i)\\b(?:fecha|date|datum|data)\\s*[:.-]?\\s*(\\d{1,2}[/-]\\d{1,2}[/-]\\d{2,4})"))?.let { fields["fecha"] = it }
+        firstMatch(text, Regex("(?i)\\b(?:fecha|date|datum|data)\\s*[:.-]?\\s*(\\d{1,4}[/-]\\d{1,2}[/-]\\d{1,4})"))?.let { fields["fecha"] = it }
         firstMatch(text, Regex("(?i)\\b(?:nif|cif|nie|vat|tax id)\\s*[:.-]?\\s*([A-Z]?[0-9]{7,9}[A-Z]?)"))?.let { fields["nif_cif"] = it }
         firstMatch(text, Regex("(?i)\\b(?:n[uú]mero|nº|n°|num(?:ero)?|no\\.?|referencia|ref\\.?|expediente)\\s*[:#.-]?\\s*([A-Z0-9][A-Z0-9./_-]{2,30})"))?.let { fields["numero"] = it }
-        firstMatch(text, Regex("(?i)\\b(?:vencimiento|fecha de vencimiento|due date|f\\.? venc\\.?)\\s*[:.-]?\\s*(\\d{1,2}[/-]\\d{1,2}[/-]\\d{2,4})"))?.let { fields["vencimiento"] = it }
-        firstMatch(text, Regex("(?i)\\b(?:subtotal|base imponible|base)\\s*[:=]?\\s*([0-9][0-9.,]*)\\s*(€|EUR|USD|\\$|GBP|£)?"))?.let { fields["subtotal"] = it }
+        firstMatch(text, Regex("(?i)\\b(?:vencimiento|fecha de vencimiento|due date|f\\.? venc\\.?)\\s*[:.-]?\\s*(\\d{1,4}[/-]\\d{1,2}[/-]\\d{1,4})"))?.let { fields["vencimiento"] = it }
+        firstMatchGroups(text, Regex("(?i)\\b(?:subtotal|base imponible|base)\\s*[:=]?\\s*([0-9][0-9.,]*)\\s*(€|EUR|USD|\\$|GBP|£)?"))?.let { match -> fields["subtotal"] = match.value }
         firstMatch(text, Regex("(?i)\\b(?:periodo|per[ií]odo|ejercicio|campaign|campa[nñ]a)\\s*[:.-]?\\s*([^\\n]{2,60})"))?.let { fields["periodo"] = cleanField(it) }
         firstMatch(text, Regex("(?i)\\b(?:tel[eé]fono|tel\\.?|phone|telephone)\\s*[:.-]?\\s*([+0-9][0-9 ()-]{6,24})"))?.let { fields["telefono"] = cleanField(it) }
         firstMatch(text, Regex("(?i)\\b(?:direcci[oó]n|domicilio|address)\\s*[:.-]?\\s*([^\\n]{4,100})"))?.let { fields["direccion"] = cleanField(it) }
@@ -168,66 +112,26 @@ object AiDocumentAnalyzer {
         firstMatch(text, Regex("(?i)\\b(?:proveedor|emisor|empresa|entidad)\\s*[:.-]?\\s*([^\\n]{3,100})"))?.let { fields["proveedor"] = cleanField(it) }
         firstMatch(text, Regex("(?i)\\b(?:cliente|destinatario|beneficiario|titular)\\s*[:.-]?\\s*([^\\n]{3,100})"))?.let { fields["cliente"] = cleanField(it) }
 
-        val summary = if (text.isBlank()) {
-            "No OCR disponible para un análisis local más preciso."
-        } else {
-            text.lineSequence()
-                .map { it.trim() }
-                .filter { it.isNotBlank() && !isOcrMarkerLine(it) }
-                .joinToString(" ")
-                .replace(Regex("\\s+"), " ")
-                .trim()
-                .take(700)
-        }
+        val summary = if (text.isBlank()) "No OCR disponible para un análisis local más preciso." else text.lineSequence().map { it.trim() }.filter { it.isNotBlank() && !isOcrMarkerLine(it) }.joinToString(" ").replace(Regex("\\s+"), " ").trim().take(700)
         return Analysis(category, title, summary, fields)
     }
 
-    private fun cleanField(value: String): String =
-        value.replace(Regex("\\s+"), " ").trim().trim('.', ':', ';', '-')
+    private data class Match(val value: String, val currency: String?)
+    private fun firstMatchGroups(text: String, regex: Regex): Match? = regex.find(text)?.let { result ->
+        val value = result.groupValues.getOrNull(1)?.trim().orEmpty()
+        if (value.isBlank()) null else Match(value, result.groupValues.getOrNull(2)?.trim()?.takeIf { it.isNotEmpty() })
+    }
 
-    private fun isOcrMarkerLine(line: String): Boolean =
-        line.matches(Regex("(?i)^=+\\s*p[áa]gina\\s+\\d+\\s*=+$")) ||
-            line.matches(Regex("(?i)^-+\\s*p[áa]gina\\s+\\d+\\s*-+$"))
-
+    private fun cleanField(value: String): String = value.replace(Regex("\\s+"), " ").trim().trim('.', ':', ';', '-')
+    private fun isOcrMarkerLine(line: String): Boolean = line.matches(Regex("(?i)^=+\\s*p[áa]gina\\s+\\d+\\s*=+$")) || line.matches(Regex("(?i)^-+\\s*p[áa]gina\\s+\\d+\\s*-+$"))
     private fun isGenericHeaderLine(line: String): Boolean {
         val normalized = line.lowercase(Locale.ROOT).replace(Regex("[^a-záéíóúüñ ]"), " ").replace(Regex("\\s+"), " ").trim()
-        return normalized in setOf(
-            "ministerio", "ministerio de inclusion", "seguridad social", "seguridad ciudadana",
-            "documento", "pagina", "servicio", "secretaria de estado", "renta de la seguridad social y pensiones"
-        )
+        return normalized in setOf("ministerio", "ministerio de inclusion", "seguridad social", "seguridad ciudadana", "documento", "pagina", "servicio", "secretaria de estado", "renta de la seguridad social y pensiones")
     }
-
-    private fun firstMatch(text: String, regex: Regex): String? =
-        regex.find(text)?.groupValues?.getOrNull(1)?.trim()?.takeIf { it.isNotEmpty() }
-
-    private fun normalizeCurrency(value: String): String = when (value.uppercase(Locale.ROOT)) {
-        "€", "EUR" -> "EUR"
-        "$", "USD" -> "USD"
-        "£", "GBP" -> "GBP"
-        else -> value
-    }
-
+    private fun firstMatch(text: String, regex: Regex): String? = regex.find(text)?.groupValues?.getOrNull(1)?.trim()?.takeIf { it.isNotEmpty() }
+    private fun normalizeCurrency(value: String): String = when (value.uppercase(Locale.ROOT)) { "€", "EUR" -> "EUR"; "$", "USD" -> "USD"; "£", "GBP" -> "GBP"; else -> value }
     private fun normalizeCategory(value: String): String = when (value.trim().uppercase(Locale.ROOT)) {
-        "FACTURAS" -> DocumentOrganizer.FACTURAS
-        "PRESUPUESTOS" -> DocumentOrganizer.PRESUPUESTOS
-        "CONTRATOS" -> DocumentOrganizer.CONTRATOS
-        "RECIBOS" -> DocumentOrganizer.RECIBOS
-        "TICKETS" -> DocumentOrganizer.TICKETS
-        "NOMINAS" -> DocumentOrganizer.NOMINAS
-        "CERTIFICADOS" -> DocumentOrganizer.CERTIFICADOS
-        "INFORMES" -> DocumentOrganizer.INFORMES
-        "CITAS" -> DocumentOrganizer.CITAS
-        else -> DocumentOrganizer.GENERAL
+        "FACTURAS" -> DocumentOrganizer.FACTURAS; "PRESUPUESTOS" -> DocumentOrganizer.PRESUPUESTOS; "CONTRATOS" -> DocumentOrganizer.CONTRATOS; "RECIBOS" -> DocumentOrganizer.RECIBOS; "TICKETS" -> DocumentOrganizer.TICKETS; "NOMINAS" -> DocumentOrganizer.NOMINAS; "CERTIFICADOS" -> DocumentOrganizer.CERTIFICADOS; "INFORMES" -> DocumentOrganizer.INFORMES; "CITAS" -> DocumentOrganizer.CITAS; else -> DocumentOrganizer.GENERAL
     }
-
-    private fun languageName(): String = when (Locale.getDefault().language.lowercase(Locale.ROOT)) {
-        "es" -> "Spanish (Spain)"
-        "en" -> "English"
-        "fr" -> "French"
-        "de" -> "German"
-        "it" -> "Italian"
-        "pt" -> "Portuguese"
-        "ca" -> "Catalan"
-        else -> Locale.getDefault().displayLanguage
-    }
+    private fun languageName(): String = when (Locale.getDefault().language.lowercase(Locale.ROOT)) { "es" -> "Spanish (Spain)"; "en" -> "English"; "fr" -> "French"; "de" -> "German"; "it" -> "Italian"; "pt" -> "Portuguese"; "ca" -> "Catalan"; else -> Locale.getDefault().displayLanguage }
 }
