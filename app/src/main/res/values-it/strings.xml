@@ -39,6 +39,7 @@
     <string name="camera_permission_required">È necessaria l’autorizzazione della fotocamera.</string>
     <string name="saved_as_pdf">Documento salvato come PDF.</string>
     <string name="share_document">Condividi documento</string>
+    <string name="open">Apri</string>
     <string name="rename_document">Rinomina documento</string>
     <string name="rename">Rinomina</string>
     <string name="delete_document">Elimina documento</string>
