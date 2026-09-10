@@ -14,8 +14,9 @@ import java.io.File
 
 /**
  * Runs the available ML Kit script recognizers, but does not concatenate their
- * independent interpretations of the same Latin document. That used to turn a
- * clean Spanish/English OCR result into several competing blocks of gibberish.
+ * independent interpretations of the same document. The Latin recognizer is
+ * preferred whenever it returns text; script-specific results are used only
+ * when Latin returns nothing and there is strong evidence for that script.
  */
 object MultilingualOcr {
     private data class Candidate(val name: String, val text: String)
@@ -79,18 +80,15 @@ object MultilingualOcr {
     }
 
     /**
-     * Prefer the Latin recognizer for European/Latin-script documents. Add a
-     * script-specific result only when it contains enough evidence that the
-     * page actually uses that script. If Latin returns nothing, use the best
-     * non-Latin candidate instead.
+     * Prefer the Latin recognizer for European/Latin-script documents. Never
+     * append another recognizer's interpretation to a successful Latin result.
+     * If Latin returns nothing, use the strongest script-specific candidate.
      */
     private fun selectCandidates(candidates: List<Candidate>): List<Candidate> {
         val latin = candidates.firstOrNull { it.name == "latin" && it.text.isNotBlank() }
-        val nonLatin = candidates.filter { it.name != "latin" && hasStrongScriptEvidence(it.name, it.text) }
+        if (latin != null) return listOf(latin)
 
-        if (latin != null) {
-            return listOf(latin) + nonLatin
-        }
+        val nonLatin = candidates.filter { it.name != "latin" && hasStrongScriptEvidence(it.name, it.text) }
         return nonLatin.maxByOrNull { it.text.length }?.let(::listOf)
             ?: candidates.maxByOrNull { it.text.length }?.let(::listOf)
             ?: emptyList()
