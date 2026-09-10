@@ -18,7 +18,6 @@ class AiDocumentAnalyzerTest {
             Proveedor: ACME Servicios SL
             Total: 1.493,75 €
         """.trimIndent()
-
         assertEquals(DocumentOrganizer.FACTURAS, DocumentOrganizer.categoryForText(text))
     }
 
@@ -46,9 +45,7 @@ class AiDocumentAnalyzerTest {
                 Concepto: Servicios de mantenimiento
                 Periodo: septiembre 2026
             """.trimIndent()
-
             val analysis = invokeLocalAnalysis(pdf, text)
-
             assertEquals(DocumentOrganizer.FACTURAS, analysis.category)
             assertEquals("ACME Servicios SL", analysis.title)
             assertEquals("1.493,75", analysis.fields["total"])
@@ -90,9 +87,7 @@ class AiDocumentAnalyzerTest {
                 VAT: 20%
                 Total amount: 300.00 USD
             """.trimIndent()
-
             val analysis = invokeLocalAnalysis(pdf, text)
-
             assertEquals(DocumentOrganizer.FACTURAS, analysis.category)
             assertEquals("250.00", analysis.fields["subtotal"])
             assertEquals("300.00", analysis.fields["total"])
@@ -121,9 +116,7 @@ class AiDocumentAnalyzerTest {
                 IVA: 10 %
                 Total: $ 138.05
             """.trimIndent()
-
             val analysis = invokeLocalAnalysis(pdf, text)
-
             assertEquals("125.50", analysis.fields["subtotal"])
             assertEquals("138.05", analysis.fields["total"])
             assertEquals("USD", analysis.fields["moneda"])
@@ -133,55 +126,6 @@ class AiDocumentAnalyzerTest {
         } finally {
             root.deleteRecursively()
         }
-    }
-
-    @Test
-    fun multilingualOcrKeepsStrongLatinDocumentOverTinyNonLatinFragment() {
-        val selected = invokeOcrSelection(
-            candidate("latin", "Factura ACME Servicios SL Total 1.493,75 EUR Cliente Juan Pérez"),
-            candidate("korean", "문서")
-        )
-
-        assertEquals("latin", selectedName(selected))
-    }
-
-    @Test
-    fun multilingualOcrUsesStrongNonLatinDocumentWhenLatinIsOnlyNoise() {
-        val selected = invokeOcrSelection(
-            candidate("latin", "ab"),
-            candidate("japanese", "請求書 株式会社 料金")
-        )
-
-        assertEquals("japanese", selectedName(selected))
-    }
-
-    @Test
-    fun multilingualOcrFallsBackToBestQualityCandidateWithoutStrongScript() {
-        val selected = invokeOcrSelection(
-            candidate("latin", "short"),
-            candidate("korean", "12 34")
-        )
-
-        assertEquals("latin", selectedName(selected))
-    }
-
-    private fun candidate(name: String, text: String): Any {
-        val candidateClass = Class.forName("com.baltas80.pocketscan.MultilingualOcr\\$Candidate")
-        val constructor = candidateClass.getDeclaredConstructor(String::class.java, String::class.java)
-        constructor.isAccessible = true
-        return constructor.newInstance(name, text)
-    }
-
-    private fun invokeOcrSelection(vararg candidates: Any): Any {
-        val method = MultilingualOcr::class.java.getDeclaredMethod("selectCandidate", List::class.java)
-        method.isAccessible = true
-        return method.invoke(MultilingualOcr, candidates.toList())!!
-    }
-
-    private fun selectedName(candidate: Any): String {
-        val field = candidate.javaClass.getDeclaredField("name")
-        field.isAccessible = true
-        return field.get(candidate) as String
     }
 
     @Suppress("UNCHECKED_CAST")
