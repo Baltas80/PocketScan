@@ -26,6 +26,8 @@ import kotlinx.coroutines.Job
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import java.io.File
+import java.nio.file.Files
+import java.nio.file.StandardCopyOption
 
 class PdfViewerActivity : AppCompatActivity() {
     private lateinit var pdfFile: File
@@ -109,7 +111,8 @@ class PdfViewerActivity : AppCompatActivity() {
                 Toast.makeText(this@PdfViewerActivity, "Corrigiendo errores de OCR con IA…", Toast.LENGTH_SHORT).show()
                 val corrected = AiPdfAssistant.correctOcr(ocr).trim()
                 if (corrected.isBlank()) throw IllegalStateException("La IA no devolvió texto corregido")
-                withContext(Dispatchers.IO) { saveOcr(corrected) }
+                val saved = withContext(Dispatchers.IO) { saveOcr(corrected) }
+                if (!saved) throw IllegalStateException("No se pudo guardar el OCR corregido")
                 AiAnalysisScheduler.enqueue(this@PdfViewerActivity, pdfFile)
                 pendingText = corrected + "\n"
                 val baseName = pdfFile.nameWithoutExtension.ifBlank { "documento" }
@@ -122,10 +125,20 @@ class PdfViewerActivity : AppCompatActivity() {
         }
     }
 
-    private fun saveOcr(text: String) {
+    private fun saveOcr(text: String): Boolean = runCatching {
         val textFile = File(pdfFile.parentFile, pdfFile.nameWithoutExtension + ".txt")
-        textFile.writeText(text + "\n", Charsets.UTF_8)
-    }
+        val temp = File(textFile.parentFile ?: textFile, textFile.name + ".tmp")
+        temp.writeText(text + "\n", Charsets.UTF_8)
+        try {
+            runCatching {
+                Files.move(temp.toPath(), textFile.toPath(), StandardCopyOption.ATOMIC_MOVE, StandardCopyOption.REPLACE_EXISTING)
+            }.getOrElse {
+                Files.move(temp.toPath(), textFile.toPath(), StandardCopyOption.REPLACE_EXISTING)
+            }
+        } finally {
+            if (temp.exists()) temp.delete()
+        }
+    }.isSuccess
 
     private fun writePendingText(uri: Uri) {
         lifecycleScope.launch(Dispatchers.IO) {
