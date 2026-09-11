@@ -110,6 +110,7 @@ class PdfViewerActivity : AppCompatActivity() {
                 val corrected = AiPdfAssistant.correctOcr(ocr).trim()
                 if (corrected.isBlank()) throw IllegalStateException("La IA no devolvió texto corregido")
                 withContext(Dispatchers.IO) { saveOcr(corrected) }
+                AiAnalysisScheduler.enqueue(this@PdfViewerActivity, pdfFile)
                 pendingText = corrected + "\n"
                 val baseName = pdfFile.nameWithoutExtension.ifBlank { "documento" }
                 correctedTextExportLauncher.launch("$baseName-corregido.txt")
@@ -147,7 +148,11 @@ class PdfViewerActivity : AppCompatActivity() {
             val result = AiDocumentAnalyzer.analyze(pdfFile, ocr)
             findViewById<Button>(R.id.viewerAi).isEnabled = true
             result.onSuccess { analysis ->
-                AiMetadataStore.save(pdfFile, analysis)
+                val saved = withContext(Dispatchers.IO) { AiMetadataStore.save(pdfFile, analysis) }
+                if (!saved) {
+                    Toast.makeText(this@PdfViewerActivity, "El análisis terminó, pero no se pudo guardar su información", Toast.LENGTH_LONG).show()
+                    return@onSuccess
+                }
                 val fields = analysis.fields.entries.joinToString("\n") { "${it.key}: ${it.value}" }
                 val message = buildString {
                     append("Categoría: ${analysis.category}\n")
