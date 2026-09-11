@@ -125,7 +125,16 @@ class ScannerActivity : AppCompatActivity() {
             runOcr(pages, text) { ocrText ->
                 pages.forEach { it.delete() }
                 val finalPdf = autoNameDocument(pdf, ocrText, "Documento")
-                if (finalPdf != pdf) text.renameTo(File(dir, finalPdf.nameWithoutExtension + ".txt"))
+                val finalText = File(dir, finalPdf.nameWithoutExtension + ".txt")
+                if (finalPdf != pdf && text.absolutePath != finalText.absolutePath) {
+                    if (!text.renameTo(finalText)) {
+                        finalPdf.renameTo(pdf)
+                        busy = false
+                        updatePageStatus()
+                        Toast.makeText(this, "No se pudo guardar el texto OCR", Toast.LENGTH_LONG).show()
+                        return@runOcr
+                    }
+                }
                 busy = false
                 Toast.makeText(this, "PDF guardado como ${finalPdf.name}", Toast.LENGTH_SHORT).show()
                 finish()
@@ -171,7 +180,10 @@ class ScannerActivity : AppCompatActivity() {
         val base = sanitizeFileName(if (cleanLine.length >= 4) "$type - $cleanLine" else type).take(80).trim().ifEmpty { "Documento" }
         var target = File(dir, "$base.pdf")
         var counter = 2
-        while (target.exists() && target.absolutePath != pdf.absolutePath) { target = File(dir, "$base ($counter).pdf"); counter++ }
+        while (target.exists() || File(dir, target.nameWithoutExtension + ".txt").exists() || File(dir, target.nameWithoutExtension + ".ai.json").exists()) {
+            target = File(dir, "$base ($counter).pdf")
+            counter++
+        }
         if (target.absolutePath == pdf.absolutePath || !pdf.renameTo(target)) return pdf
         return target
     }
