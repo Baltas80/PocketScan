@@ -6,6 +6,7 @@ import androidx.work.ExistingWorkPolicy
 import androidx.work.OneTimeWorkRequestBuilder
 import androidx.work.WorkManager
 import java.io.File
+import java.security.MessageDigest
 
 object AiAnalysisScheduler {
     private const val UNIQUE_PREFIX = "ai-document-analysis-"
@@ -21,9 +22,14 @@ object AiAnalysisScheduler {
             .build()
 
         WorkManager.getInstance(context.applicationContext).enqueueUniqueWork(
-            UNIQUE_PREFIX + document.absolutePath.hashCode(),
+            UNIQUE_PREFIX + stableId(document.absolutePath),
             ExistingWorkPolicy.KEEP,
             request
         )
+    }
+
+    private fun stableId(path: String): String {
+        val digest = MessageDigest.getInstance("SHA-256").digest(path.toByteArray(Charsets.UTF_8))
+        return digest.joinToString("") { "%02x".format(it) }
     }
 }
