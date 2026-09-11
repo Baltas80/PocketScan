@@ -161,7 +161,6 @@ class DocumentsActivity : AppCompatActivity() {
             document.close()
         }
     }
-
     private fun decodeBitmapForPdf(file: File): Bitmap? {
         val maxDimension = 2200
         val bounds = BitmapFactory.Options().apply { inJustDecodeBounds = true }
@@ -190,16 +189,21 @@ class DocumentsActivity : AppCompatActivity() {
         val oldAi = AiMetadataStore.sidecarFor(file)
         val newAi = File(target.parentFile, target.nameWithoutExtension + ".ai.json")
         if (target.exists() || newText.exists() || newAi.exists()) return false
+        AiAnalysisScheduler.cancel(this, file)
         if (!file.renameTo(target)) return false
         val textExists = oldText.isFile
         val aiExists = oldAi.isFile
         val textMoved = !textExists || oldText.renameTo(newText)
         val aiMoved = !aiExists || oldAi.renameTo(newAi)
-        if (textMoved && aiMoved) return true
+        if (textMoved && aiMoved) {
+            AiAnalysisScheduler.enqueue(this, target)
+            return true
+        }
         if (aiMoved && aiExists) newAi.renameTo(oldAi)
         if (textMoved && textExists) newText.renameTo(oldText)
         target.renameTo(file)
+        AiAnalysisScheduler.enqueue(this, file)
         return false
     }
-    private fun deleteDocument(file: File) { AlertDialog.Builder(this).setTitle(R.string.delete_document).setMessage(file.name).setNegativeButton(android.R.string.cancel, null).setPositiveButton(R.string.delete) { _, _ -> lifecycleScope.launch { val deleted = withContext(Dispatchers.IO) { if (!file.isFile || !file.delete()) false else { File(file.parentFile, file.nameWithoutExtension + ".txt").delete(); AiMetadataStore.delete(file); true } }; if (deleted) loadDocuments() else Toast.makeText(this@DocumentsActivity, R.string.delete_failed, Toast.LENGTH_SHORT).show() } }.show() }
+    private fun deleteDocument(file: File) { AlertDialog.Builder(this).setTitle(R.string.delete_document).setMessage(file.name).setNegativeButton(android.R.string.cancel, null).setPositiveButton(R.string.delete) { _, _ -> lifecycleScope.launch { val deleted = withContext(Dispatchers.IO) { if (!file.isFile || !file.delete()) false else { File(file.parentFile, file.nameWithoutExtension + ".txt").delete(); AiMetadataStore.delete(file); true } }; if (deleted) { AiAnalysisScheduler.cancel(this@DocumentsActivity, file); loadDocuments() } else Toast.makeText(this@DocumentsActivity, R.string.delete_failed, Toast.LENGTH_LONG).show() } }.show() }
 }
