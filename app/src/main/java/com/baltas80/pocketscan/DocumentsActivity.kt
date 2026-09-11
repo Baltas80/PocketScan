@@ -57,8 +57,10 @@ class DocumentsActivity : AppCompatActivity() {
 
     override fun onResume() {
         super.onResume()
-        AppLockManager.authenticateIfNeeded(this) { finish() }
-        if (!isFinishing && !isDestroyed) loadDocuments()
+        AppLockManager.ensureUnlocked(this) { success ->
+            if (success && !isFinishing && !isDestroyed) loadDocuments()
+            else if (!success && !isFinishing) finish()
+        }
     }
 
     override fun onDestroy() {
@@ -144,6 +146,22 @@ class DocumentsActivity : AppCompatActivity() {
     private fun suggestDocumentName(text: String, fallback: String): String { val lines = text.lines().map { it.trim() }.filter { it.length >= 4 }; val type = when (DocumentOrganizer.categoryForText(text)) { DocumentOrganizer.FACTURAS -> "Factura"; DocumentOrganizer.PRESUPUESTOS -> "Presupuesto"; DocumentOrganizer.CONTRATOS -> "Contrato"; DocumentOrganizer.RECIBOS -> "Recibo"; DocumentOrganizer.TICKETS -> "Ticket"; DocumentOrganizer.NOMINAS -> "Nomina"; DocumentOrganizer.CERTIFICADOS -> "Certificado"; DocumentOrganizer.INFORMES -> "Informe"; DocumentOrganizer.CITAS -> "Cita"; else -> fallback }; val usefulLine = lines.firstOrNull { line -> !line.lowercase().contains(type.lowercase()) && !line.lowercase().matches(Regex("[0-9 ./:-]+")) }; val cleanLine = sanitizeFileName(usefulLine ?: type).take(45).trim().trim('.', '_', '-'); return sanitizeFileName(if (cleanLine.length >= 4) "$type - $cleanLine" else type).take(80).trim().ifEmpty { "Documento" } }
     private fun sanitizeFileName(value: String): String { val withoutAccents = Normalizer.normalize(value, Normalizer.Form.NFD).replace("\\p{InCombiningDiacriticalMarks}+".toRegex(), ""); return withoutAccents.replace(Regex("[^A-Za-z0-9 _()-]"), "_").replace(Regex("\\s+"), " ").trim() }
     private fun normalizeSearch(value: String): String = Normalizer.normalize(value.lowercase(), Normalizer.Form.NFD).replace("\\p{InCombiningDiacriticalMarks}+".toRegex(), "")
-    private fun renameDocument(file: File) { val input = EditText(this).apply { setText(file.nameWithoutExtension); selectAll() }; AlertDialog.Builder(this).setTitle(R.string.rename_document).setView(input).setNegativeButton(android.R.string.cancel, null).setPositiveButton(R.string.rename) { _, _ -> val newName = sanitizeFileName(input.text.toString().trim()); if (newName.isEmpty()) return@setPositiveButton; val target = File(file.parentFile, "$newName.pdf"); if (target.exists()) { Toast.makeText(this, R.string.file_already_exists, Toast.LENGTH_SHORT).show(); return@setPositiveButton }; lifecycleScope.launch { val success = withContext(Dispatchers.IO) { if (!file.renameTo(target)) false else { File(file.parentFile, file.nameWithoutExtension + ".txt").renameTo(File(file.parentFile, "$newName.txt")); AiMetadataStore.sidecarFor(file).renameTo(File(file.parentFile, "$newName.ai.json")); true } }; if (success) loadDocuments() else Toast.makeText(this@DocumentsActivity, R.string.rename_failed, Toast.LENGTH_SHORT).show() } }.show() }
+    private fun renameDocument(file: File) { val input = EditText(this).apply { setText(file.nameWithoutExtension); selectAll() }; AlertDialog.Builder(this).setTitle(R.string.rename_document).setView(input).setNegativeButton(android.R.string.cancel, null).setPositiveButton(R.string.rename) { _, _ -> val newName = sanitizeFileName(input.text.toString().trim()); if (newName.isEmpty()) return@setPositiveButton; val target = File(file.parentFile, "$newName.pdf"); if (target.exists()) { Toast.makeText(this, R.string.file_already_exists, Toast.LENGTH_SHORT).show(); return@setPositiveButton }; lifecycleScope.launch { val success = withContext(Dispatchers.IO) { renameDocumentFiles(file, target) }; if (success) loadDocuments() else Toast.makeText(this@DocumentsActivity, R.string.rename_failed, Toast.LENGTH_SHORT).show() } }.show() }
+    private fun renameDocumentFiles(file: File, target: File): Boolean {
+        if (!file.renameTo(target)) return false
+        val oldText = File(target.parentFile, file.nameWithoutExtension + ".txt")
+        val newText = File(target.parentFile, target.nameWithoutExtension + ".txt")
+        val oldAi = AiMetadataStore.sidecarFor(file)
+        val newAi = File(target.parentFile, target.nameWithoutExtension + ".ai.json")
+        val textExists = oldText.isFile
+        val aiExists = oldAi.isFile
+        val textMoved = !textExists || oldText.renameTo(newText)
+        val aiMoved = !aiExists || oldAi.renameTo(newAi)
+        if (textMoved && aiMoved) return true
+        if (aiMoved && aiExists) newAi.renameTo(oldAi)
+        if (textMoved && textExists) newText.renameTo(oldText)
+        target.renameTo(file)
+        return false
+    }
     private fun deleteDocument(file: File) { AlertDialog.Builder(this).setTitle(R.string.delete_document).setMessage(file.name).setNegativeButton(android.R.string.cancel, null).setPositiveButton(R.string.delete) { _, _ -> lifecycleScope.launch { val deleted = withContext(Dispatchers.IO) { val result = file.delete(); File(file.parentFile, file.nameWithoutExtension + ".txt").delete(); AiMetadataStore.delete(file); result }; if (deleted) loadDocuments() else Toast.makeText(this@DocumentsActivity, R.string.delete_failed, Toast.LENGTH_SHORT).show() } }.show() }
 }
