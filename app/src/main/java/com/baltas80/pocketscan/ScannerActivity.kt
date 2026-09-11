@@ -6,7 +6,7 @@ import android.graphics.Bitmap
 import android.graphics.BitmapFactory
 import android.graphics.Matrix
 import android.graphics.Paint
-import android.graphics.pdf.PdfDocument
+import android.graphics.PdfDocument
 import android.net.Uri
 import android.os.Bundle
 import android.widget.Button
@@ -185,22 +185,50 @@ class ScannerActivity : AppCompatActivity() {
         val document = PdfDocument()
         try {
             files.forEachIndexed { index, file ->
-                val source = BitmapFactory.decodeFile(file.absolutePath) ?: error("No se pudo leer la imagen")
-                val rotated = applyExifRotation(file, source)
-                val enhanced = enhanceDocument(rotated)
-                val page = document.startPage(PdfDocument.PageInfo.Builder(595, 842, index + 1).create())
-                val margin = 24f
-                val scale = minOf((595f - margin * 2) / enhanced.width, (842f - margin * 2) / enhanced.height)
-                val width = enhanced.width * scale; val height = enhanced.height * scale
-                val left = (595f - width) / 2f; val top = (842f - height) / 2f
-                page.canvas.drawBitmap(enhanced, null, android.graphics.RectF(left, top, left + width, top + height), Paint(Paint.ANTI_ALIAS_FLAG or Paint.FILTER_BITMAP_FLAG))
-                document.finishPage(page)
-                if (enhanced !== rotated) enhanced.recycle()
-                if (rotated !== source) rotated.recycle()
-                source.recycle()
+                val source = decodeBitmapForPdf(file) ?: error("No se pudo leer la imagen")
+                try {
+                    val rotated = applyExifRotation(file, source)
+                    try {
+                        val enhanced = enhanceDocument(rotated)
+                        try {
+                            val page = document.startPage(PdfDocument.PageInfo.Builder(595, 842, index + 1).create())
+                            try {
+                                val margin = 24f
+                                val scale = minOf((595f - margin * 2) / enhanced.width, (842f - margin * 2) / enhanced.height)
+                                val width = enhanced.width * scale; val height = enhanced.height * scale
+                                val left = (595f - width) / 2f; val top = (842f - height) / 2f
+                                page.canvas.drawBitmap(enhanced, null, android.graphics.RectF(left, top, left + width, top + height), Paint(Paint.ANTI_ALIAS_FLAG or Paint.FILTER_BITMAP_FLAG))
+                            } finally {
+                                document.finishPage(page)
+                            }
+                        } finally {
+                            enhanced.recycle()
+                        }
+                    } finally {
+                        if (rotated !== source) rotated.recycle()
+                    }
+                } finally {
+                    source.recycle()
+                }
             }
             FileOutputStream(pdfFile).use { document.writeTo(it) }
         } finally { document.close() }
+    }
+
+    private fun decodeBitmapForPdf(file: File): Bitmap? {
+        val maxDimension = 2200
+        val bounds = BitmapFactory.Options().apply { inJustDecodeBounds = true }
+        BitmapFactory.decodeFile(file.absolutePath, bounds)
+        if (bounds.outWidth <= 0 || bounds.outHeight <= 0) return null
+        var sample = 1
+        while (bounds.outWidth / sample > maxDimension || bounds.outHeight / sample > maxDimension) sample *= 2
+        return BitmapFactory.decodeFile(
+            file.absolutePath,
+            BitmapFactory.Options().apply {
+                inSampleSize = sample
+                inPreferredConfig = Bitmap.Config.ARGB_8888
+            }
+        )
     }
 
     private fun enhanceDocument(input: Bitmap): Bitmap {
