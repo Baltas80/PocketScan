@@ -147,7 +147,10 @@ class ScannerActivity : AppCompatActivity() {
                 Toast.makeText(this, "No se pudo guardar el texto OCR", Toast.LENGTH_LONG).show()
             })
         } catch (e: Exception) {
-            busy = false; updatePageStatus()
+            pdf.delete()
+            text.delete()
+            busy = false
+            updatePageStatus()
             Toast.makeText(this, e.message ?: "No se pudo crear el PDF", Toast.LENGTH_LONG).show()
         }
     }
