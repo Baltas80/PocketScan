@@ -46,6 +46,9 @@ object AiMetadataStore {
 
     fun delete(document: File): Boolean = runCatching {
         val sidecar = sidecarFor(document)
-        !sidecar.exists() || sidecar.delete()
+        val temp = File(sidecar.parentFile ?: document, sidecar.name + ".tmp")
+        val sidecarDeleted = !sidecar.exists() || sidecar.delete()
+        val tempDeleted = !temp.exists() || temp.delete()
+        sidecarDeleted && tempDeleted
     }.getOrDefault(false)
 }
