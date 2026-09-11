@@ -114,7 +114,8 @@ class DocumentsActivity : AppCompatActivity() {
                             val renamedPdf = autoNameDocument(pdf, ocrText, getString(R.string.my_documents))
                             val finalText = File(renamedPdf.parentFile, renamedPdf.nameWithoutExtension + ".txt")
                             if (text.exists() && text.absolutePath != finalText.absolutePath && !text.renameTo(finalText)) {
-                                renamedPdf.delete(); return@withContext null
+                                if (renamedPdf.absolutePath != pdf.absolutePath) renamedPdf.renameTo(pdf)
+                                return@withContext null
                             }
                             val finalOcr = runCatching { finalText.takeIf { it.exists() }?.readText(Charsets.UTF_8).orEmpty() }.getOrDefault(ocrText)
                             val detected = DocumentOrganizer.categoryForText(finalOcr)
