@@ -114,4 +114,34 @@ class DocumentOrganizerTest {
             root.deleteRecursively()
         }
     }
+
+    @Test
+    fun moveDocumentSkipsAllOccupiedSuffixesAndKeepsMatchingSidecars() {
+        val root = Files.createTempDirectory("pocketscan").toFile()
+        try {
+            val source = root.resolve("incoming").apply { mkdirs() }
+            val pdf = source.resolve("invoice.pdf").apply { writeText("new pdf") }
+            val text = source.resolve("invoice.txt").apply { writeText("new ocr") }
+            source.resolve("invoice.ai.json").writeText("{\"version\":3}")
+            val targetDir = DocumentOrganizer.directory(root, DocumentOrganizer.FACTURAS)
+
+            targetDir.resolve("invoice.pdf").writeText("pdf 1")
+            targetDir.resolve("invoice.txt").writeText("ocr 1")
+            targetDir.resolve("invoice.ai.json").writeText("{\"version\":1}")
+            targetDir.resolve("invoice (2).pdf").writeText("pdf 2")
+            targetDir.resolve("invoice (2).txt").writeText("ocr 2")
+            targetDir.resolve("invoice (2).ai.json").writeText("{\"version\":2}")
+
+            val moved = DocumentOrganizer.moveDocument(pdf, text, root, DocumentOrganizer.FACTURAS)
+
+            assertEquals("invoice (3).pdf", moved.name)
+            assertEquals("new pdf", moved.readText())
+            assertEquals("new ocr", targetDir.resolve("invoice (3).txt").readText())
+            assertEquals("{\"version\":3}", targetDir.resolve("invoice (3).ai.json").readText())
+            assertEquals("pdf 1", targetDir.resolve("invoice.pdf").readText())
+            assertEquals("pdf 2", targetDir.resolve("invoice (2).pdf").readText())
+        } finally {
+            root.deleteRecursively()
+        }
+    }
 }
