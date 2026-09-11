@@ -190,7 +190,10 @@ class DocumentsActivity : AppCompatActivity() {
         val newAi = File(target.parentFile, target.nameWithoutExtension + ".ai.json")
         if (target.exists() || newText.exists() || newAi.exists()) return false
         AiAnalysisScheduler.cancel(this, file)
-        if (!file.renameTo(target)) return false
+        if (!file.renameTo(target)) {
+            AiAnalysisScheduler.enqueue(this, file)
+            return false
+        }
         val textExists = oldText.isFile
         val aiExists = oldAi.isFile
         val textMoved = !textExists || oldText.renameTo(newText)
