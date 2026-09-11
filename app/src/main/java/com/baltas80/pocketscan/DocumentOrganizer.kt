@@ -58,28 +58,51 @@ object DocumentOrganizer {
         File(scansDir, if (categories.contains(category)) category else GENERAL).apply { mkdirs() }
 
     fun moveDocument(pdf: File, text: File?, scansDir: File, category: String): File {
+        val sourceDir = pdf.parentFile ?: return pdf
         val targetDir = directory(scansDir, category)
-        if (pdf.parentFile?.canonicalFile == targetDir.canonicalFile) return pdf
+        if (sourceDir.canonicalFile == targetDir.canonicalFile) return pdf
+
+        val sourceAi = File(sourceDir, pdf.nameWithoutExtension + ".ai.json")
         var target = File(targetDir, pdf.name)
         var counter = 2
         while (target.exists() || File(targetDir, target.nameWithoutExtension + ".txt").exists() || File(targetDir, target.nameWithoutExtension + ".ai.json").exists()) {
             target = File(targetDir, "${pdf.nameWithoutExtension} ($counter).pdf")
             counter++
         }
+
         if (!pdf.renameTo(target)) return pdf
-        moveSidecar(text, targetDir, target.nameWithoutExtension + ".txt")
-        moveSidecar(File(pdf.parentFile, pdf.nameWithoutExtension + ".ai.json"), targetDir, target.nameWithoutExtension + ".ai.json")
+
+        val moved = mutableListOf<Pair<File, File>>()
+        fun rollback(): File {
+            moved.asReversed().forEach { (from, to) ->
+                if (to.exists()) to.renameTo(from)
+            }
+            if (target.exists()) target.renameTo(pdf)
+            return pdf
+        }
+
+        if (!moveSidecar(text, targetDir, target.nameWithoutExtension + ".txt") { moved += it }) return rollback()
+        if (!moveSidecar(sourceAi, targetDir, target.nameWithoutExtension + ".ai.json") { moved += it }) return rollback()
         return target
     }
 
-    private fun moveSidecar(source: File?, targetDir: File, targetName: String) {
-        source?.takeIf { it.exists() }?.let { sidecar ->
-            val target = File(targetDir, targetName)
-            if (target.exists()) return
-            if (!sidecar.renameTo(target)) {
-                runCatching { sidecar.copyTo(target, overwrite = false) }
-                    .onSuccess { sidecar.delete() }
-            }
+    private fun moveSidecar(source: File?, targetDir: File, targetName: String, onMoved: (Pair<File, File>) -> Unit): Boolean {
+        val sidecar = source?.takeIf { it.exists() } ?: return true
+        val target = File(targetDir, targetName)
+        if (target.exists()) return false
+        if (sidecar.renameTo(target)) {
+            onMoved(sidecar to target)
+            return true
         }
+        return runCatching {
+            sidecar.copyTo(target, overwrite = false)
+            if (!sidecar.delete()) {
+                target.delete()
+                false
+            } else {
+                onMoved(sidecar to target)
+                true
+            }
+        }.getOrDefault(false)
     }
 }
