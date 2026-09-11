@@ -137,6 +137,7 @@ class ScannerActivity : AppCompatActivity() {
                 pages.forEach { it.delete() }
                 capturedPages.clear()
                 busy = false
+                AiAnalysisScheduler.enqueue(this, finalPdf)
                 Toast.makeText(this, "PDF guardado como ${finalPdf.name}", Toast.LENGTH_SHORT).show()
                 finish()
             }, onFailure = {
