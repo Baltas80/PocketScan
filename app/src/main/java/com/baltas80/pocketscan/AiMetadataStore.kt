@@ -44,5 +44,8 @@ object AiMetadataStore {
         AiDocumentAnalyzer.Analysis(json.optString("category", DocumentOrganizer.GENERAL), json.optString("title", document.nameWithoutExtension), json.optString("summary", ""), fields, json.optString("source", "local"))
     }.getOrNull()
 
-    fun delete(document: File): Boolean = runCatching { !sidecarFor(document).exists() || sidecarFor(document).delete() }.getOrDefault(false)
+    fun delete(document: File): Boolean = runCatching {
+        val sidecar = sidecarFor(document)
+        !sidecar.exists() || sidecar.delete()
+    }.getOrDefault(false)
 }
