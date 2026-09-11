@@ -29,10 +29,15 @@ jobs:
         run: gradle testDebugUnitTest --stacktrace
       - name: Build debug APK
         run: gradle assembleDebug --stacktrace
+      - name: Build release APK and AAB
+        run: gradle assembleRelease bundleRelease --stacktrace
       - name: Run Android lint
         run: gradle lintDebug --stacktrace
-      - name: Upload APK
+      - name: Upload APKs and AAB
         uses: actions/upload-artifact@v4
         with:
-          name: PocketScan-debug
-          path: app/build/outputs/apk/debug/app-debug.apk
+          name: PocketScan-builds
+          path: |
+            app/build/outputs/apk/debug/app-debug.apk
+            app/build/outputs/apk/release/app-release.apk
+            app/build/outputs/bundle/release/app-release.aab
