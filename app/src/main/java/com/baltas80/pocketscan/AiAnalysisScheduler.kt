@@ -23,9 +23,14 @@ object AiAnalysisScheduler {
 
         WorkManager.getInstance(context.applicationContext).enqueueUniqueWork(
             UNIQUE_PREFIX + stableId(document.absolutePath),
-            ExistingWorkPolicy.KEEP,
+            ExistingWorkPolicy.REPLACE,
             request
         )
+    }
+
+    fun cancel(context: Context, document: File) {
+        WorkManager.getInstance(context.applicationContext)
+            .cancelUniqueWork(UNIQUE_PREFIX + stableId(document.absolutePath))
     }
 
     private fun stableId(path: String): String {
