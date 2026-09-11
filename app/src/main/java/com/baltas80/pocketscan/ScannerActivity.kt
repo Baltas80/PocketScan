@@ -122,8 +122,7 @@ class ScannerActivity : AppCompatActivity() {
         val text = File(dir, "document_$stamp.txt")
         try {
             createPdf(pages, pdf)
-            runOcr(pages, text) { ocrText ->
-                pages.forEach { it.delete() }
+            runOcr(pages, text, onComplete = { ocrText ->
                 val finalPdf = autoNameDocument(pdf, ocrText, "Documento")
                 val finalText = File(dir, finalPdf.nameWithoutExtension + ".txt")
                 if (finalPdf != pdf && text.absolutePath != finalText.absolutePath) {
@@ -135,22 +134,42 @@ class ScannerActivity : AppCompatActivity() {
                         return@runOcr
                     }
                 }
+                pages.forEach { it.delete() }
+                capturedPages.clear()
                 busy = false
                 Toast.makeText(this, "PDF guardado como ${finalPdf.name}", Toast.LENGTH_SHORT).show()
                 finish()
-            }
+            }, onFailure = {
+                pdf.delete()
+                text.delete()
+                busy = false
+                updatePageStatus()
+                Toast.makeText(this, "No se pudo guardar el texto OCR", Toast.LENGTH_LONG).show()
+            })
         } catch (e: Exception) {
             busy = false; updatePageStatus()
             Toast.makeText(this, e.message ?: "No se pudo crear el PDF", Toast.LENGTH_LONG).show()
         }
     }
 
-    private fun runOcr(files: List<File>, textFile: File, onComplete: (String) -> Unit) {
+    private fun runOcr(
+        files: List<File>,
+        textFile: File,
+        onComplete: (String) -> Unit,
+        onFailure: () -> Unit
+    ) {
         val recognizer = TextRecognition.getClient(TextRecognizerOptions.DEFAULT_OPTIONS)
         val all = StringBuilder()
         fun complete() {
-            try { val result = all.toString(); textFile.writeText(result, Charsets.UTF_8); onComplete(result) }
-            finally { recognizer.close() }
+            runCatching {
+                textFile.writeText(all.toString(), Charsets.UTF_8)
+            }.onSuccess {
+                recognizer.close()
+                onComplete(all.toString())
+            }.onFailure {
+                recognizer.close()
+                onFailure()
+            }
         }
         fun next(index: Int) {
             if (index >= files.size) { complete(); return }
