@@ -84,8 +84,17 @@ class SmartScannerActivity : AppCompatActivity() {
                     if (usableEnhancedPages.size == pages.size) {
                         val improvedPdf = File(dir, "document_$stamp.improved.pdf")
                         if (DocumentImageEnhancer.buildPdfFromJpegs(usableEnhancedPages, improvedPdf)) {
-                            pdfFile.delete()
-                            if (!improvedPdf.renameTo(pdfFile)) improvedPdf.delete()
+                            val backupPdf = File(dir, "document_$stamp.original.pdf")
+                            if (pdfFile.renameTo(backupPdf)) {
+                                if (improvedPdf.renameTo(pdfFile)) {
+                                    backupPdf.delete()
+                                } else {
+                                    backupPdf.renameTo(pdfFile)
+                                    improvedPdf.delete()
+                                }
+                            } else {
+                                improvedPdf.delete()
+                            }
                         } else {
                             improvedPdf.delete()
                         }
