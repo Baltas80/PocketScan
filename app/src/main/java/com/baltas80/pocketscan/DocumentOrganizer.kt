@@ -41,7 +41,7 @@ object DocumentOrganizer {
         terms.any { term -> value.contains(term) }
 
     private fun normalizeForClassification(text: String): String =
-        Normalizer.normalize(text, Normalizer.Form.NFKC)
+        Normalizer.normalize(text, Normalizer.Form.NFD)
             .replace("\\p{M}+".toRegex(), "")
             .replace("[\\u200B-\\u200D\\uFEFF]".toRegex(), "")
             .replace("[\\u00A0\\u202F]".toRegex(), " ")
