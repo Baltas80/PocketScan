@@ -13,9 +13,16 @@ object AiMetadataStore {
         sidecar.parentFile?.mkdirs()
         val fields = JSONObject()
         analysis.fields.forEach { (key, value) -> fields.put(key, value) }
-        JSONObject().put("version", VERSION).put("source", analysis.source).put("category", analysis.category)
+        val json = JSONObject().put("version", VERSION).put("source", analysis.source).put("category", analysis.category)
             .put("title", analysis.title).put("summary", analysis.summary).put("fields", fields)
-            .put("updatedAt", System.currentTimeMillis()).also { sidecar.writeText(it.toString(), Charsets.UTF_8) }
+            .put("updatedAt", System.currentTimeMillis()).toString()
+
+        val temp = File(sidecar.parentFile ?: document, sidecar.name + ".tmp")
+        temp.writeText(json, Charsets.UTF_8)
+        if (!temp.renameTo(sidecar)) {
+            temp.delete()
+            return false
+        }
         true
     }.getOrDefault(false)
 
