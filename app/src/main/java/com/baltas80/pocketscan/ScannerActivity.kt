@@ -27,6 +27,8 @@ import com.google.mlkit.vision.text.TextRecognition
 import com.google.mlkit.vision.text.latin.TextRecognizerOptions
 import java.io.File
 import java.io.FileOutputStream
+import java.nio.file.Files
+import java.nio.file.StandardCopyOption
 import java.text.Normalizer
 import java.text.SimpleDateFormat
 import java.util.Date
@@ -166,7 +168,17 @@ class ScannerActivity : AppCompatActivity() {
         val all = StringBuilder()
         fun complete() {
             runCatching {
-                textFile.writeText(all.toString(), Charsets.UTF_8)
+                val temp = File(textFile.parentFile ?: textFile, textFile.name + ".tmp")
+                temp.writeText(all.toString(), Charsets.UTF_8)
+                try {
+                    try {
+                        Files.move(temp.toPath(), textFile.toPath(), StandardCopyOption.ATOMIC_MOVE, StandardCopyOption.REPLACE_EXISTING)
+                    } catch (_: java.nio.file.AtomicMoveNotSupportedException) {
+                        Files.move(temp.toPath(), textFile.toPath(), StandardCopyOption.REPLACE_EXISTING)
+                    }
+                } finally {
+                    if (temp.exists()) temp.delete()
+                }
             }.onSuccess {
                 recognizer.close()
                 onComplete(all.toString())
