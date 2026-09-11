@@ -85,7 +85,7 @@ class SmartScannerActivity : AppCompatActivity() {
                         val improvedPdf = File(dir, "document_$stamp.improved.pdf")
                         if (DocumentImageEnhancer.buildPdfFromJpegs(usableEnhancedPages, improvedPdf)) {
                             pdfFile.delete()
-                            improvedPdf.renameTo(pdfFile)
+                            if (!improvedPdf.renameTo(pdfFile)) improvedPdf.delete()
                         } else {
                             improvedPdf.delete()
                         }
@@ -108,24 +108,41 @@ class SmartScannerActivity : AppCompatActivity() {
             val ocrUris = pages.mapIndexed { index, page ->
                 enhancedPages[index]?.let { Uri.fromFile(it) } ?: page.imageUri
             }
-            runOcr(ocrUris, textFile) {
+            runOcr(ocrUris, textFile, onComplete = {
                 lifecycleScope.launch {
                     val saved = withContext(Dispatchers.IO) {
-                        val ocrText = textFile.takeIf { it.exists() }?.readText(Charsets.UTF_8).orEmpty()
+                        val ocrText = textFile.readText(Charsets.UTF_8)
                         val namedPdf = autoNameDocument(pdfFile, ocrText)
                         val namedText = File(namedPdf.parentFile, namedPdf.nameWithoutExtension + ".txt")
-                        if (textFile.exists() && textFile.absolutePath != namedText.absolutePath) textFile.renameTo(namedText)
+                        if (textFile.absolutePath != namedText.absolutePath && !textFile.renameTo(namedText)) {
+                            if (namedPdf.absolutePath != pdfFile.absolutePath) namedPdf.renameTo(pdfFile)
+                            return@withContext null
+                        }
                         val category = DocumentOrganizer.categoryForText(ocrText)
                         val finalPdf = DocumentOrganizer.moveDocument(namedPdf, namedText, dir, category)
                         Triple(category, finalPdf, pages.size)
                     }
+                    if (saved == null) {
+                        enhancedPages.filterNotNull().forEach { it.delete() }
+                        enhancedPages.firstOrNull()?.parentFile?.deleteRecursively()
+                        Toast.makeText(this@SmartScannerActivity, "No se pudo guardar el texto OCR", Toast.LENGTH_LONG).show()
+                        finish()
+                        return@launch
+                    }
                     AiAnalysisScheduler.enqueue(this@SmartScannerActivity, saved.second)
                     enhancedPages.filterNotNull().forEach { it.delete() }
-                    enhancedPages.firstOrNull()?.parentFile?.delete()
+                    enhancedPages.firstOrNull()?.parentFile?.deleteRecursively()
                     Toast.makeText(this@SmartScannerActivity, "Documento guardado en ${saved.first} (${saved.third} página(s))", Toast.LENGTH_SHORT).show()
                     finish()
                 }
-            }
+            }, onFailure = {
+                pdfFile.delete()
+                textFile.delete()
+                enhancedPages.filterNotNull().forEach { it.delete() }
+                enhancedPages.firstOrNull()?.parentFile?.deleteRecursively()
+                Toast.makeText(this@SmartScannerActivity, "No se pudo guardar el texto OCR", Toast.LENGTH_LONG).show()
+                finish()
+            })
         }
     }
 
@@ -147,7 +164,14 @@ class SmartScannerActivity : AppCompatActivity() {
         val base = sanitizeFileName("$type - $clean").take(80).trim().ifEmpty { "Documento" }
         var target = File(pdf.parentFile, "$base.pdf")
         var counter = 2
-        while (target.exists() && target.absolutePath != pdf.absolutePath) { target = File(pdf.parentFile, "$base ($counter).pdf"); counter++ }
+        while (
+            target.exists() && target.absolutePath != pdf.absolutePath ||
+            File(target.parentFile, target.nameWithoutExtension + ".txt").exists() && File(target.parentFile, target.nameWithoutExtension + ".txt").absolutePath != File(pdf.parentFile, pdf.nameWithoutExtension + ".txt").absolutePath ||
+            File(target.parentFile, target.nameWithoutExtension + ".ai.json").exists() && File(target.parentFile, target.nameWithoutExtension + ".ai.json").absolutePath != File(pdf.parentFile, pdf.nameWithoutExtension + ".ai.json").absolutePath
+        ) {
+            target = File(pdf.parentFile, "$base ($counter).pdf")
+            counter++
+        }
         return if (target.absolutePath == pdf.absolutePath || pdf.renameTo(target)) target else pdf
     }
 
@@ -157,11 +181,18 @@ class SmartScannerActivity : AppCompatActivity() {
             .replace(Regex("[^A-Za-z0-9 _()-]"), "_")
             .replace(Regex("\\s+"), " ").trim()
 
-    private fun runOcr(uris: List<Uri>, textFile: File, onComplete: () -> Unit) {
+    private fun runOcr(
+        uris: List<Uri>,
+        textFile: File,
+        onComplete: () -> Unit,
+        onFailure: () -> Unit
+    ) {
         MultilingualOcr.recognizeUris(uris, this) { text ->
             lifecycleScope.launch(Dispatchers.IO) {
-                runCatching { textFile.writeText(text.trim() + "\n", Charsets.UTF_8) }
-                withContext(Dispatchers.Main) { onComplete() }
+                val saved = runCatching { textFile.writeText(text.trim() + "\n", Charsets.UTF_8) }.isSuccess
+                withContext(Dispatchers.Main) {
+                    if (saved) onComplete() else onFailure()
+                }
             }
         }
     }
