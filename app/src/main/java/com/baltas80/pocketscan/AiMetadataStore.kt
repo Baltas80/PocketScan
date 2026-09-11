@@ -2,6 +2,7 @@ package com.baltas80.pocketscan
 
 import org.json.JSONObject
 import java.io.File
+import java.nio.file.AtomicMoveNotSupportedException
 import java.nio.file.Files
 import java.nio.file.StandardCopyOption
 
@@ -22,12 +23,20 @@ object AiMetadataStore {
         val temp = File(sidecar.parentFile ?: document, sidecar.name + ".tmp")
         temp.writeText(json, Charsets.UTF_8)
         try {
-            Files.move(
-                temp.toPath(),
-                sidecar.toPath(),
-                StandardCopyOption.ATOMIC_MOVE,
-                StandardCopyOption.REPLACE_EXISTING
-            )
+            try {
+                Files.move(
+                    temp.toPath(),
+                    sidecar.toPath(),
+                    StandardCopyOption.ATOMIC_MOVE,
+                    StandardCopyOption.REPLACE_EXISTING
+                )
+            } catch (_: AtomicMoveNotSupportedException) {
+                Files.move(
+                    temp.toPath(),
+                    sidecar.toPath(),
+                    StandardCopyOption.REPLACE_EXISTING
+                )
+            }
         } finally {
             if (temp.exists()) temp.delete()
         }
