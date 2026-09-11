@@ -62,7 +62,7 @@ dependencies {
 
     // App Check: Play Integrity for production, Debug provider for local builds.
     implementation("com.google.firebase:firebase-appcheck-playintegrity")
-    implementation("com.google.firebase:firebase-appcheck-debug")
+    debugImplementation("com.google.firebase:firebase-appcheck-debug")
 
     testImplementation("junit:junit:4.13.2")
     testImplementation("org.json:json:20250517")
