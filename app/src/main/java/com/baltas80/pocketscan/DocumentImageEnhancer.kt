@@ -21,21 +21,39 @@ object DocumentImageEnhancer {
     private const val HIGH_PERCENTILE = 0.98f
 
     fun enhanceToJpeg(context: Context, uri: Uri, output: File): Boolean = runCatching {
-        val source = context.contentResolver.openInputStream(uri)?.use { BitmapFactory.decodeStream(it) }
-            ?: return false
+        val source = decodeForEnhancement(context, uri) ?: return false
         val bitmap = resizeIfNeeded(source)
         if (bitmap !== source) source.recycle()
 
-        val enhanced = enhance(bitmap)
-        if (enhanced !== bitmap) bitmap.recycle()
-
-        output.parentFile?.mkdirs()
-        FileOutputStream(output).use { stream ->
-            enhanced.compress(Bitmap.CompressFormat.JPEG, 94, stream)
+        try {
+            val enhanced = enhance(bitmap)
+            try {
+                output.parentFile?.mkdirs()
+                FileOutputStream(output).use { stream ->
+                    if (!enhanced.compress(Bitmap.CompressFormat.JPEG, 94, stream)) return false
+                }
+            } finally {
+                enhanced.recycle()
+            }
+        } finally {
+            bitmap.recycle()
         }
-        enhanced.recycle()
         true
     }.getOrElse { false }
+
+    private fun decodeForEnhancement(context: Context, uri: Uri): Bitmap? {
+        val bounds = BitmapFactory.Options().apply { inJustDecodeBounds = true }
+        context.contentResolver.openInputStream(uri)?.use { BitmapFactory.decodeStream(it, null, bounds) }
+        if (bounds.outWidth <= 0 || bounds.outHeight <= 0) return null
+
+        var sample = 1
+        while (bounds.outWidth / sample > MAX_DIMENSION || bounds.outHeight / sample > MAX_DIMENSION) sample *= 2
+        val options = BitmapFactory.Options().apply {
+            inSampleSize = sample
+            inPreferredConfig = Bitmap.Config.ARGB_8888
+        }
+        return context.contentResolver.openInputStream(uri)?.use { BitmapFactory.decodeStream(it, null, options) }
+    }
 
     private fun resizeIfNeeded(source: Bitmap): Bitmap {
         val max = maxOf(source.width, source.height)
@@ -103,8 +121,11 @@ object DocumentImageEnhancer {
                         index + 1
                     ).create()
                     val page = document.startPage(pageInfo)
-                    page.canvas.drawBitmap(bitmap, 0f, 0f, Paint(Paint.ANTI_ALIAS_FLAG or Paint.FILTER_BITMAP_FLAG))
-                    document.finishPage(page)
+                    try {
+                        page.canvas.drawBitmap(bitmap, 0f, 0f, Paint(Paint.ANTI_ALIAS_FLAG or Paint.FILTER_BITMAP_FLAG))
+                    } finally {
+                        document.finishPage(page)
+                    }
                 } finally {
                     bitmap.recycle()
                 }
