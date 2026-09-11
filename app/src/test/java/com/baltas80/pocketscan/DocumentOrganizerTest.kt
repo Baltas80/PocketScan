@@ -15,6 +15,12 @@ class DocumentOrganizerTest {
     }
 
     @Test
+    fun categoryForTextNormalizesAccentedSpanishCharacters() {
+        assertEquals(DocumentOrganizer.FACTURAS, DocumentOrganizer.categoryForText("FACTÚRA DE PROVEEDOR"))
+        assertEquals(DocumentOrganizer.NOMINAS, DocumentOrganizer.categoryForText("NÓMINA MENSUAL"))
+    }
+
+    @Test
     fun categoryForFileUsesTopLevelCategoryDirectory() {
         val root = Files.createTempDirectory("pocketscan").toFile()
         try {
