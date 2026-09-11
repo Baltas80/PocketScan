@@ -92,4 +92,26 @@ class DocumentOrganizerTest {
             root.deleteRecursively()
         }
     }
+
+    @Test
+    fun moveDocumentAvoidsOverwritingAiSidecarWhenOcrIsAbsent() {
+        val root = Files.createTempDirectory("pocketscan").toFile()
+        try {
+            val source = root.resolve("incoming").apply { mkdirs() }
+            val pdf = source.resolve("invoice.pdf").apply { writeText("new pdf") }
+            source.resolve("invoice.ai.json").writeText("{\"version\":2}")
+            val targetDir = DocumentOrganizer.directory(root, DocumentOrganizer.FACTURAS)
+            targetDir.resolve("invoice.ai.json").writeText("{\"version\":1}")
+
+            val moved = DocumentOrganizer.moveDocument(pdf, null, root, DocumentOrganizer.FACTURAS)
+
+            assertEquals("invoice (2).pdf", moved.name)
+            assertEquals("new pdf", moved.readText())
+            assertEquals("{\"version\":2}", targetDir.resolve("invoice (2).ai.json").readText())
+            assertEquals("{\"version\":1}", targetDir.resolve("invoice.ai.json").readText())
+            assertTrue(!source.resolve("invoice.ai.json").exists())
+        } finally {
+            root.deleteRecursively()
+        }
+    }
 }
