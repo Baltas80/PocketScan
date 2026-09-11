@@ -62,7 +62,7 @@ object DocumentOrganizer {
         if (pdf.parentFile?.canonicalFile == targetDir.canonicalFile) return pdf
         var target = File(targetDir, pdf.name)
         var counter = 2
-        while (target.exists()) {
+        while (target.exists() || File(targetDir, target.nameWithoutExtension + ".txt").exists() || File(targetDir, target.nameWithoutExtension + ".ai.json").exists()) {
             target = File(targetDir, "${pdf.nameWithoutExtension} ($counter).pdf")
             counter++
         }
@@ -75,9 +75,10 @@ object DocumentOrganizer {
     private fun moveSidecar(source: File?, targetDir: File, targetName: String) {
         source?.takeIf { it.exists() }?.let { sidecar ->
             val target = File(targetDir, targetName)
+            if (target.exists()) return
             if (!sidecar.renameTo(target)) {
-                sidecar.copyTo(target, overwrite = true)
-                sidecar.delete()
+                runCatching { sidecar.copyTo(target, overwrite = false) }
+                    .onSuccess { sidecar.delete() }
             }
         }
     }
