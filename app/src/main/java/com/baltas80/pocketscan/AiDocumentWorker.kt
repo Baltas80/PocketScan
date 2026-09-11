@@ -21,12 +21,21 @@ class AiDocumentWorker(
         }.getOrDefault("")
 
         val analysis = AiDocumentAnalyzer.analyze(document, ocrText)
-            .getOrElse { return Result.retry() }
+            .getOrElse {
+                return if (runAttemptCount < MAX_RETRIES) Result.retry() else Result.failure()
+            }
 
-        return if (AiMetadataStore.save(document, analysis)) Result.success() else Result.retry()
+        return if (AiMetadataStore.save(document, analysis)) {
+            Result.success()
+        } else if (runAttemptCount < MAX_RETRIES) {
+            Result.retry()
+        } else {
+            Result.failure()
+        }
     }
 
     companion object {
         const val KEY_DOCUMENT_PATH = "document_path"
+        private const val MAX_RETRIES = 3
     }
 }
