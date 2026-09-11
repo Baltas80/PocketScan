@@ -15,6 +15,8 @@ import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import java.io.File
 import java.io.FileOutputStream
+import java.nio.file.Files
+import java.nio.file.StandardCopyOption
 import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.Locale
@@ -198,7 +200,19 @@ class SmartScannerActivity : AppCompatActivity() {
     ) {
         MultilingualOcr.recognizeUris(uris, this) { text ->
             lifecycleScope.launch(Dispatchers.IO) {
-                val saved = runCatching { textFile.writeText(text.trim() + "\n", Charsets.UTF_8) }.isSuccess
+                val saved = runCatching {
+                    val temp = File(textFile.parentFile ?: textFile, textFile.name + ".tmp")
+                    temp.writeText(text.trim() + "\n", Charsets.UTF_8)
+                    try {
+                        runCatching {
+                            Files.move(temp.toPath(), textFile.toPath(), StandardCopyOption.ATOMIC_MOVE, StandardCopyOption.REPLACE_EXISTING)
+                        }.getOrElse {
+                            Files.move(temp.toPath(), textFile.toPath(), StandardCopyOption.REPLACE_EXISTING)
+                        }
+                    } finally {
+                        if (temp.exists()) temp.delete()
+                    }
+                }.isSuccess
                 withContext(Dispatchers.Main) {
                     if (saved) onComplete() else onFailure()
                 }
