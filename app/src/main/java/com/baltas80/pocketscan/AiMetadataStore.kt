@@ -2,6 +2,8 @@ package com.baltas80.pocketscan
 
 import org.json.JSONObject
 import java.io.File
+import java.nio.file.Files
+import java.nio.file.StandardCopyOption
 
 object AiMetadataStore {
     private const val VERSION = 1
@@ -19,9 +21,15 @@ object AiMetadataStore {
 
         val temp = File(sidecar.parentFile ?: document, sidecar.name + ".tmp")
         temp.writeText(json, Charsets.UTF_8)
-        if (!temp.renameTo(sidecar)) {
-            temp.delete()
-            return false
+        try {
+            Files.move(
+                temp.toPath(),
+                sidecar.toPath(),
+                StandardCopyOption.ATOMIC_MOVE,
+                StandardCopyOption.REPLACE_EXISTING
+            )
+        } finally {
+            if (temp.exists()) temp.delete()
         }
         true
     }.getOrDefault(false)
