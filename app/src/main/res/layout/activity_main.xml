@@ -18,8 +18,13 @@
                 <TextView android:layout_width="wrap_content" android:layout_height="wrap_content" android:text="PocketScan" android:textColor="@color/pocketscan_text" android:textSize="29sp" android:textStyle="bold" />
                 <TextView android:layout_width="wrap_content" android:layout_height="wrap_content" android:layout_marginTop="2dp" android:text="@string/tagline" android:textColor="@color/pocketscan_muted" android:textSize="13sp" />
             </LinearLayout>
-            <com.google.android.material.card.MaterialCardView android:layout_width="48dp" android:layout_height="48dp" app:cardBackgroundColor="@color/pocketscan_blue_soft" app:cardCornerRadius="16dp" app:strokeWidth="0dp">
-                <TextView android:layout_width="match_parent" android:layout_height="match_parent" android:gravity="center" android:text="PS" android:textColor="@color/pocketscan_blue_dark" android:textSize="14sp" android:textStyle="bold" />
+            <com.google.android.material.card.MaterialCardView android:layout_width="52dp" android:layout_height="52dp" app:cardBackgroundColor="@color/pocketscan_blue_soft" app:cardCornerRadius="17dp" app:strokeWidth="0dp">
+                <ImageView
+                    android:layout_width="match_parent"
+                    android:layout_height="match_parent"
+                    android:contentDescription="PocketScan"
+                    android:padding="8dp"
+                    android:src="@drawable/ic_pocketscan_logo" />
             </com.google.android.material.card.MaterialCardView>
         </LinearLayout>
         <com.google.android.material.card.MaterialCardView android:layout_width="match_parent" android:layout_height="wrap_content" android:layout_marginTop="24dp" app:cardBackgroundColor="@color/pocketscan_hero" app:cardCornerRadius="26dp" app:strokeWidth="0dp">
