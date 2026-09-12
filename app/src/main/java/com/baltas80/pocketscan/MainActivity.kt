@@ -23,6 +23,7 @@ class MainActivity : AppCompatActivity() {
             }
         }
         updateLockButton()
+        AdsConsentManager.prepare(this, findViewById(R.id.adViewContainer))
     }
 
     override fun onResume() {
