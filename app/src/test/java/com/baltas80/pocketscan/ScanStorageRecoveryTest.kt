@@ -13,6 +13,7 @@ class ScanStorageRecoveryTest {
             root.resolve("invoice.pdf.tmp").writeText("partial")
             root.resolve("invoice.txt.tmp").writeText("partial")
             root.resolve("invoice.ai.json.tmp").writeText("partial")
+            root.resolve("invoice.jpg.tmp").writeText("partial")
             root.resolve("document.improved.pdf").writeText("partial")
             root.resolve("document.original.pdf").writeText("backup")
             root.resolve("page_20260912_110419_123.jpg").writeText("orphan")
@@ -20,7 +21,7 @@ class ScanStorageRecoveryTest {
             val validInvoice = root.resolve("invoice.pdf").apply { writeText("valid") }
             val validDocument = root.resolve("document.pdf").apply { writeText("valid-document") }
 
-            assertEquals(6, ScanStorageRecovery.cleanup(root))
+            assertEquals(7, ScanStorageRecovery.cleanup(root))
             assertTrue(validInvoice.isFile)
             assertEquals("valid", validInvoice.readText())
             assertTrue(validDocument.isFile)
