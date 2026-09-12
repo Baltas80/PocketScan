@@ -136,10 +136,11 @@ class DocumentsActivity : AppCompatActivity() {
     }
 
     private data class ImportFiles(val tempFiles: List<File>, val pdf: File, val text: File)
-    private fun prepareImportedImages(uris: List<Uri>): ImportFiles? { scansDir.mkdirs(); val stamp = System.currentTimeMillis(); val pdf = File(scansDir, "document_import_$stamp.pdf"); val text = File(scansDir, "document_import_$stamp.txt"); val tempFiles = mutableListOf<File>(); return try { uris.forEachIndexed { index, uri -> val temp = File(scansDir, "import_${stamp}_$index.jpg"); contentResolver.openInputStream(uri)?.use { input -> FileOutputStream(temp).use { output -> input.copyTo(output) } } ?: error("Unable to read image"); tempFiles.add(temp) }; ImportFiles(tempFiles, pdf, text) } catch (_: Exception) { tempFiles.forEach { it.delete() }; pdf.delete(); text.delete(); null } }
+    private fun prepareImportedImages(uris: List<Uri>): ImportFiles? { scansDir.mkdirs(); val stamp = System.currentTimeMillis(); val pdf = File(scansDir, "document_import_$stamp.pdf"); val text = File(scansDir, "document_import_$stamp.txt"); val tempFiles = mutableListOf<File>(); return try { uris.forEachIndexed { index, uri -> val temp = File(scansDir, "import_${stamp}_$index.jpg"); contentResolver.openInputStream(uri)?.use { input -> FileOutputStream(temp).use { output -> input.copyTo(output); output.fd.sync() } } ?: error("Unable to read image"); tempFiles.add(temp) }; ImportFiles(tempFiles, pdf, text) } catch (_: Exception) { tempFiles.forEach { it.delete() }; pdf.delete(); text.delete(); null } }
     private fun createPdfFromImagesAsync(files: List<File>, pdfFile: File, onComplete: (Boolean) -> Unit) { lifecycleScope.launch { val success = withContext(Dispatchers.Default) { runCatching { createPdfFromImages(files, pdfFile) }.isSuccess }; onComplete(success) } }
     private fun createPdfFromImages(files: List<File>, pdfFile: File) {
         val document = PdfDocument()
+        val tempFile = File(pdfFile.parentFile ?: scansDir, pdfFile.name + ".tmp")
         try {
             files.forEachIndexed { index, file ->
                 val bitmap = decodeBitmapForPdf(file) ?: error("Invalid image")
@@ -148,8 +149,17 @@ class DocumentsActivity : AppCompatActivity() {
                     try { val margin = 24f; val scale = minOf((595f - margin * 2) / bitmap.width, (842f - margin * 2) / bitmap.height); val width = bitmap.width * scale; val height = bitmap.height * scale; val left = (595f - width) / 2f; val top = (842f - height) / 2f; page.canvas.drawBitmap(bitmap, null, RectF(left, top, left + width, top + height), null) } finally { document.finishPage(page) }
                 } finally { bitmap.recycle() }
             }
-            FileOutputStream(pdfFile).use { document.writeTo(it) }
-        } finally { document.close() }
+            tempFile.parentFile?.mkdirs()
+            FileOutputStream(tempFile).use { stream -> document.writeTo(stream); stream.fd.sync() }
+            try {
+                Files.move(tempFile.toPath(), pdfFile.toPath(), StandardCopyOption.ATOMIC_MOVE, StandardCopyOption.REPLACE_EXISTING)
+            } catch (_: AtomicMoveNotSupportedException) {
+                Files.move(tempFile.toPath(), pdfFile.toPath(), StandardCopyOption.REPLACE_EXISTING)
+            }
+        } finally {
+            tempFile.delete()
+            document.close()
+        }
     }
     private fun decodeBitmapForPdf(file: File): Bitmap? { val maxDimension = 2200; val bounds = BitmapFactory.Options().apply { inJustDecodeBounds = true }; BitmapFactory.decodeFile(file.absolutePath, bounds); if (bounds.outWidth <= 0 || bounds.outHeight <= 0) return null; var sample = 1; while (bounds.outWidth / sample > maxDimension || bounds.outHeight / sample > maxDimension) sample *= 2; return BitmapFactory.decodeFile(file.absolutePath, BitmapFactory.Options().apply { inSampleSize = sample; inPreferredConfig = Bitmap.Config.RGB_565 }) }
 
