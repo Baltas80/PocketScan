@@ -50,4 +50,25 @@ class AiMetadataStoreTest {
             root.deleteRecursively()
         }
     }
+
+    @Test
+    fun saveFailsWhenDocumentDoesNotExist() {
+        val root = Files.createTempDirectory("pocketscan-ai").toFile()
+        try {
+            val document = root.resolve("missing.pdf")
+            val analysis = AiDocumentAnalyzer.Analysis(
+                category = DocumentOrganizer.FACTURAS,
+                title = "Factura",
+                summary = "",
+                fields = linkedMapOf<String, String>(),
+                source = "local"
+            )
+
+            assertFalse(AiMetadataStore.save(document, analysis))
+            assertFalse(root.resolve("missing.ai.json").exists())
+            assertFalse(root.resolve("missing.ai.json.tmp").exists())
+        } finally {
+            root.deleteRecursively()
+        }
+    }
 }
