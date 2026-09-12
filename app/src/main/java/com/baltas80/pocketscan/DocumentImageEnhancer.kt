@@ -123,7 +123,7 @@ object DocumentImageEnhancer {
         val document = android.graphics.pdf.PdfDocument()
         try {
             images.forEachIndexed { index, imageFile ->
-                val bitmap = BitmapFactory.decodeFile(imageFile.absolutePath) ?: return false
+                val bitmap = decodeForPdf(imageFile) ?: return false
                 try {
                     val pageInfo = android.graphics.pdf.PdfDocument.PageInfo.Builder(
                         bitmap.width,
@@ -159,4 +159,20 @@ object DocumentImageEnhancer {
             document.close()
         }
     }.getOrElse { false }
+
+    private fun decodeForPdf(file: File): Bitmap? {
+        val bounds = BitmapFactory.Options().apply { inJustDecodeBounds = true }
+        BitmapFactory.decodeFile(file.absolutePath, bounds)
+        if (bounds.outWidth <= 0 || bounds.outHeight <= 0) return null
+
+        var sample = 1
+        while (bounds.outWidth / sample > MAX_DIMENSION || bounds.outHeight / sample > MAX_DIMENSION) sample *= 2
+        return BitmapFactory.decodeFile(
+            file.absolutePath,
+            BitmapFactory.Options().apply {
+                inSampleSize = sample
+                inPreferredConfig = Bitmap.Config.ARGB_8888
+            }
+        )
+    }
 }
