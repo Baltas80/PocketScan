@@ -5,7 +5,6 @@
     android:layout_height="match_parent"
     android:background="@color/pocketscan_background"
     android:fillViewport="true">
-
     <LinearLayout
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
@@ -14,195 +13,50 @@
         android:paddingTop="22dp"
         android:paddingEnd="20dp"
         android:paddingBottom="28dp">
-
-        <LinearLayout
-            android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            android:gravity="center_vertical"
-            android:orientation="horizontal">
-            <LinearLayout
-                android:layout_width="0dp"
-                android:layout_height="wrap_content"
-                android:layout_weight="1"
-                android:orientation="vertical">
-                <TextView
-                    android:layout_width="wrap_content"
-                    android:layout_height="wrap_content"
-                    android:text="PocketScan"
-                    android:textColor="@color/pocketscan_text"
-                    android:textSize="29sp"
-                    android:textStyle="bold" />
-                <TextView
-                    android:layout_width="wrap_content"
-                    android:layout_height="wrap_content"
-                    android:layout_marginTop="2dp"
-                    android:text="@string/tagline"
-                    android:textColor="@color/pocketscan_muted"
-                    android:textSize="13sp" />
+        <LinearLayout android:layout_width="match_parent" android:layout_height="wrap_content" android:gravity="center_vertical" android:orientation="horizontal">
+            <LinearLayout android:layout_width="0dp" android:layout_height="wrap_content" android:layout_weight="1" android:orientation="vertical">
+                <TextView android:layout_width="wrap_content" android:layout_height="wrap_content" android:text="PocketScan" android:textColor="@color/pocketscan_text" android:textSize="29sp" android:textStyle="bold" />
+                <TextView android:layout_width="wrap_content" android:layout_height="wrap_content" android:layout_marginTop="2dp" android:text="@string/tagline" android:textColor="@color/pocketscan_muted" android:textSize="13sp" />
             </LinearLayout>
-            <com.google.android.material.card.MaterialCardView
-                android:layout_width="48dp"
-                android:layout_height="48dp"
-                app:cardBackgroundColor="@color/pocketscan_blue_soft"
-                app:cardCornerRadius="16dp"
-                app:strokeWidth="0dp">
-                <TextView
-                    android:layout_width="match_parent"
-                    android:layout_height="match_parent"
-                    android:gravity="center"
-                    android:text="PS"
-                    android:textColor="@color/pocketscan_blue_dark"
-                    android:textSize="14sp"
-                    android:textStyle="bold" />
+            <com.google.android.material.card.MaterialCardView android:layout_width="48dp" android:layout_height="48dp" app:cardBackgroundColor="@color/pocketscan_blue_soft" app:cardCornerRadius="16dp" app:strokeWidth="0dp">
+                <TextView android:layout_width="match_parent" android:layout_height="match_parent" android:gravity="center" android:text="PS" android:textColor="@color/pocketscan_blue_dark" android:textSize="14sp" android:textStyle="bold" />
             </com.google.android.material.card.MaterialCardView>
         </LinearLayout>
-
-        <com.google.android.material.card.MaterialCardView
-            android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            android:layout_marginTop="24dp"
-            app:cardBackgroundColor="@color/pocketscan_hero"
-            app:cardCornerRadius="26dp"
-            app:strokeWidth="0dp">
-            <LinearLayout
-                android:layout_width="match_parent"
-                android:layout_height="wrap_content"
-                android:orientation="vertical"
-                android:padding="22dp">
-                <TextView
-                    android:layout_width="wrap_content"
-                    android:layout_height="wrap_content"
-                    android:text="@string/home_eyebrow"
-                    android:textColor="@color/pocketscan_blue"
-                    android:textSize="12sp"
-                    android:textStyle="bold" />
-                <TextView
-                    android:layout_width="match_parent"
-                    android:layout_height="wrap_content"
-                    android:layout_marginTop="8dp"
-                    android:text="@string/home_headline"
-                    android:textColor="@color/pocketscan_text"
-                    android:textSize="24sp"
-                    android:textStyle="bold" />
-                <TextView
-                    android:layout_width="match_parent"
-                    android:layout_height="wrap_content"
-                    android:layout_marginTop="7dp"
-                    android:text="@string/home_description"
-                    android:textColor="@color/pocketscan_muted"
-                    android:textSize="14sp"
-                    android:lineSpacingExtra="2dp" />
-                <com.google.android.material.button.MaterialButton
-                    android:id="@+id/scanButton"
-                    android:layout_width="match_parent"
-                    android:layout_height="56dp"
-                    android:layout_marginTop="18dp"
-                    android:text="@string/scan_document"
-                    android:textAllCaps="false"
-                    android:textSize="16sp"
-                    app:cornerRadius="18dp" />
+        <com.google.android.material.card.MaterialCardView android:layout_width="match_parent" android:layout_height="wrap_content" android:layout_marginTop="24dp" app:cardBackgroundColor="@color/pocketscan_hero" app:cardCornerRadius="26dp" app:strokeWidth="0dp">
+            <LinearLayout android:layout_width="match_parent" android:layout_height="wrap_content" android:orientation="vertical" android:padding="22dp">
+                <TextView android:layout_width="wrap_content" android:layout_height="wrap_content" android:text="@string/home_eyebrow" android:textColor="@color/pocketscan_blue" android:textSize="12sp" android:textStyle="bold" />
+                <TextView android:layout_width="match_parent" android:layout_height="wrap_content" android:layout_marginTop="8dp" android:text="@string/home_headline" android:textColor="@color/pocketscan_text" android:textSize="24sp" android:textStyle="bold" />
+                <TextView android:layout_width="match_parent" android:layout_height="wrap_content" android:layout_marginTop="7dp" android:text="@string/home_description" android:textColor="@color/pocketscan_muted" android:textSize="14sp" android:lineSpacingExtra="2dp" />
+                <com.google.android.material.button.MaterialButton android:id="@+id/scanButton" android:layout_width="match_parent" android:layout_height="56dp" android:layout_marginTop="18dp" android:text="@string/scan_document" android:textAllCaps="false" android:textSize="16sp" app:cornerRadius="18dp" />
             </LinearLayout>
         </com.google.android.material.card.MaterialCardView>
-
-        <TextView
-            android:layout_width="wrap_content"
-            android:layout_height="wrap_content"
-            android:layout_marginTop="26dp"
-            android:text="@string/home_quick_title"
-            android:textColor="@color/pocketscan_text"
-            android:textSize="17sp"
-            android:textStyle="bold" />
-
-        <LinearLayout
-            android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            android:layout_marginTop="10dp"
-            android:orientation="horizontal">
-            <com.google.android.material.card.MaterialCardView
-                android:id="@+id/documentsButton"
-                android:layout_width="0dp"
-                android:layout_height="112dp"
-                android:layout_weight="1"
-                android:clickable="true"
-                android:focusable="true"
-                android:foreground="?attr/selectableItemBackground"
-                app:cardBackgroundColor="@color/pocketscan_surface"
-                app:cardCornerRadius="20dp"
-                app:strokeColor="@color/pocketscan_border"
-                app:strokeWidth="1dp">
-                <LinearLayout
-                    android:layout_width="match_parent"
-                    android:layout_height="match_parent"
-                    android:gravity="center_vertical"
-                    android:orientation="vertical"
-                    android:padding="16dp">
+        <TextView android:layout_width="wrap_content" android:layout_height="wrap_content" android:layout_marginTop="26dp" android:text="@string/home_quick_title" android:textColor="@color/pocketscan_text" android:textSize="17sp" android:textStyle="bold" />
+        <LinearLayout android:layout_width="match_parent" android:layout_height="wrap_content" android:layout_marginTop="10dp" android:orientation="horizontal">
+            <com.google.android.material.card.MaterialCardView android:layout_width="0dp" android:layout_height="112dp" android:layout_weight="1" app:cardBackgroundColor="@color/pocketscan_surface" app:cardCornerRadius="20dp" app:strokeColor="@color/pocketscan_border" app:strokeWidth="1dp">
+                <LinearLayout android:layout_width="match_parent" android:layout_height="match_parent" android:gravity="center_vertical" android:orientation="vertical" android:padding="12dp">
                     <TextView android:layout_width="wrap_content" android:layout_height="wrap_content" android:text="01" android:textColor="@color/pocketscan_blue" android:textSize="12sp" android:textStyle="bold" />
-                    <TextView android:layout_width="match_parent" android:layout_height="wrap_content" android:layout_marginTop="7dp" android:text="@string/my_documents" android:textColor="@color/pocketscan_text" android:textSize="16sp" android:textStyle="bold" />
-                    <TextView android:layout_width="match_parent" android:layout_height="wrap_content" android:layout_marginTop="3dp" android:text="@string/home_documents_hint" android:textColor="@color/pocketscan_muted" android:textSize="12sp" />
+                    <com.google.android.material.button.MaterialButton android:id="@+id/documentsButton" style="@style/Widget.Material3.Button.TextButton" android:layout_width="match_parent" android:layout_height="42dp" android:gravity="start|center_vertical" android:paddingStart="0dp" android:text="@string/my_documents" android:textAllCaps="false" android:textColor="@color/pocketscan_text" android:textSize="16sp" app:cornerRadius="14dp" />
+                    <TextView android:layout_width="match_parent" android:layout_height="wrap_content" android:text="@string/home_documents_hint" android:textColor="@color/pocketscan_muted" android:textSize="11sp" />
                 </LinearLayout>
             </com.google.android.material.card.MaterialCardView>
             <Space android:layout_width="10dp" android:layout_height="1dp" />
-            <com.google.android.material.card.MaterialCardView
-                android:id="@+id/aiAssistantButton"
-                android:layout_width="0dp"
-                android:layout_height="112dp"
-                android:layout_weight="1"
-                android:clickable="true"
-                android:focusable="true"
-                android:foreground="?attr/selectableItemBackground"
-                app:cardBackgroundColor="@color/pocketscan_surface"
-                app:cardCornerRadius="20dp"
-                app:strokeColor="@color/pocketscan_border"
-                app:strokeWidth="1dp">
-                <LinearLayout
-                    android:layout_width="match_parent"
-                    android:layout_height="match_parent"
-                    android:gravity="center_vertical"
-                    android:orientation="vertical"
-                    android:padding="16dp">
+            <com.google.android.material.card.MaterialCardView android:layout_width="0dp" android:layout_height="112dp" android:layout_weight="1" app:cardBackgroundColor="@color/pocketscan_surface" app:cardCornerRadius="20dp" app:strokeColor="@color/pocketscan_border" app:strokeWidth="1dp">
+                <LinearLayout android:layout_width="match_parent" android:layout_height="match_parent" android:gravity="center_vertical" android:orientation="vertical" android:padding="12dp">
                     <TextView android:layout_width="wrap_content" android:layout_height="wrap_content" android:text="02" android:textColor="@color/pocketscan_blue" android:textSize="12sp" android:textStyle="bold" />
-                    <TextView android:layout_width="match_parent" android:layout_height="wrap_content" android:layout_marginTop="7dp" android:text="@string/ai_assistant" android:textColor="@color/pocketscan_text" android:textSize="16sp" android:textStyle="bold" />
-                    <TextView android:layout_width="match_parent" android:layout_height="wrap_content" android:layout_marginTop="3dp" android:text="@string/home_ai_hint" android:textColor="@color/pocketscan_muted" android:textSize="12sp" />
+                    <com.google.android.material.button.MaterialButton android:id="@+id/aiAssistantButton" style="@style/Widget.Material3.Button.TextButton" android:layout_width="match_parent" android:layout_height="42dp" android:gravity="start|center_vertical" android:paddingStart="0dp" android:text="@string/ai_assistant" android:textAllCaps="false" android:textColor="@color/pocketscan_text" android:textSize="16sp" app:cornerRadius="14dp" />
+                    <TextView android:layout_width="match_parent" android:layout_height="wrap_content" android:text="@string/home_ai_hint" android:textColor="@color/pocketscan_muted" android:textSize="11sp" />
                 </LinearLayout>
             </com.google.android.material.card.MaterialCardView>
         </LinearLayout>
-
-        <com.google.android.material.card.MaterialCardView
-            android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            android:layout_marginTop="12dp"
-            app:cardBackgroundColor="@color/pocketscan_surface"
-            app:cardCornerRadius="20dp"
-            app:strokeColor="@color/pocketscan_border"
-            app:strokeWidth="1dp">
-            <LinearLayout
-                android:layout_width="match_parent"
-                android:layout_height="wrap_content"
-                android:orientation="horizontal"
-                android:padding="16dp">
+        <com.google.android.material.card.MaterialCardView android:layout_width="match_parent" android:layout_height="wrap_content" android:layout_marginTop="12dp" app:cardBackgroundColor="@color/pocketscan_surface" app:cardCornerRadius="20dp" app:strokeColor="@color/pocketscan_border" app:strokeWidth="1dp">
+            <LinearLayout android:layout_width="match_parent" android:layout_height="wrap_content" android:orientation="horizontal" android:padding="16dp">
                 <LinearLayout android:layout_width="0dp" android:layout_height="wrap_content" android:layout_weight="1" android:orientation="vertical">
                     <TextView android:layout_width="wrap_content" android:layout_height="wrap_content" android:text="@string/privacy_title" android:textColor="@color/pocketscan_text" android:textSize="15sp" android:textStyle="bold" />
                     <TextView android:layout_width="match_parent" android:layout_height="wrap_content" android:layout_marginTop="4dp" android:text="@string/privacy_short" android:textColor="@color/pocketscan_muted" android:textSize="12sp" />
                 </LinearLayout>
-                <com.google.android.material.button.MaterialButton
-                    android:id="@+id/lockButton"
-                    style="@style/Widget.Material3.Button.TextButton"
-                    android:layout_width="wrap_content"
-                    android:layout_height="48dp"
-                    android:text="@string/biometric_lock"
-                    android:textAllCaps="false"
-                    android:textSize="12sp"
-                    app:cornerRadius="14dp" />
+                <com.google.android.material.button.MaterialButton android:id="@+id/lockButton" style="@style/Widget.Material3.Button.TextButton" android:layout_width="wrap_content" android:layout_height="48dp" android:text="@string/biometric_lock" android:textAllCaps="false" android:textSize="12sp" app:cornerRadius="14dp" />
             </LinearLayout>
         </com.google.android.material.card.MaterialCardView>
-
-        <TextView
-            android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            android:layout_marginTop="16dp"
-            android:gravity="center"
-            android:text="@string/home_privacy"
-            android:textColor="@color/pocketscan_muted"
-            android:textSize="11sp" />
+        <TextView android:layout_width="match_parent" android:layout_height="wrap_content" android:layout_marginTop="16dp" android:gravity="center" android:text="@string/home_privacy" android:textColor="@color/pocketscan_muted" android:textSize="11sp" />
     </LinearLayout>
 </ScrollView>
