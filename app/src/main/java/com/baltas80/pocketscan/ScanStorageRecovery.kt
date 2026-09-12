@@ -6,11 +6,28 @@ import java.io.File
 object ScanStorageRecovery {
     fun cleanup(scansDir: File): Int {
         if (!scansDir.isDirectory) return 0
-        var removed = 0
+        var handled = 0
         scansDir.walkTopDown().filter { it.isFile }.toList().forEach { file ->
-            if (isRecoveryFile(file) && file.delete()) removed++
+            when {
+                file.name.endsWith(".pdf.tmp", true) ||
+                    file.name.endsWith(".txt.tmp", true) ||
+                    file.name.endsWith(".ai.json.tmp", true) ||
+                    file.name.endsWith(".improved.pdf", true) -> {
+                    if (file.delete()) handled++
+                }
+
+                file.name.endsWith(".original.pdf", true) -> {
+                    val baseName = file.name.dropLast(".original.pdf".length)
+                    val restored = File(file.parentFile, "$baseName.pdf")
+                    if (restored.isFile) {
+                        if (file.delete()) handled++
+                    } else if (file.renameTo(restored)) {
+                        handled++
+                    }
+                }
+            }
         }
-        return removed
+        return handled
     }
 
     private fun isRecoveryFile(file: File): Boolean =
