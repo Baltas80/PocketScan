@@ -74,11 +74,12 @@ object DocumentOrganizer {
 
         val moved = mutableListOf<Pair<File, File>>()
         fun rollback(): File {
+            var rollbackOk = true
             moved.asReversed().forEach { (from, to) ->
-                if (to.exists()) to.renameTo(from)
+                if (to.exists() && !to.renameTo(from)) rollbackOk = false
             }
-            if (target.exists()) target.renameTo(pdf)
-            return pdf
+            if (target.exists() && !target.renameTo(pdf)) rollbackOk = false
+            return if (rollbackOk && pdf.isFile) pdf else target
         }
 
         if (!moveSidecar(text, targetDir, target.nameWithoutExtension + ".txt") { moved += it }) return rollback()
