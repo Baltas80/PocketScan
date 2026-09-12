@@ -1,5 +1,6 @@
 <?xml version="1.0" encoding="utf-8"?>
 <LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
     android:layout_width="match_parent"
     android:layout_height="match_parent"
     android:orientation="vertical"
@@ -10,97 +11,141 @@
         android:layout_height="wrap_content"
         android:gravity="center_vertical"
         android:orientation="horizontal"
-        android:paddingStart="16dp"
-        android:paddingTop="8dp"
+        android:paddingStart="18dp"
+        android:paddingTop="10dp"
         android:paddingEnd="12dp"
-        android:paddingBottom="6dp">
+        android:paddingBottom="10dp">
 
-        <TextView
-            android:id="@+id/viewerTitle"
+        <LinearLayout
             android:layout_width="0dp"
             android:layout_height="wrap_content"
             android:layout_weight="1"
-            android:ellipsize="end"
-            android:maxLines="1"
-            android:textColor="@color/pocketscan_text"
-            android:textSize="20sp"
-            android:textStyle="bold" />
+            android:orientation="vertical">
+            <TextView
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="DOCUMENTO"
+                android:textColor="@color/pocketscan_blue"
+                android:textSize="10sp"
+                android:textStyle="bold"
+                android:letterSpacing="0.14" />
+            <TextView
+                android:id="@+id/viewerTitle"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="2dp"
+                android:ellipsize="end"
+                android:maxLines="1"
+                android:textColor="@color/pocketscan_text"
+                android:textSize="20sp"
+                android:textStyle="bold" />
+        </LinearLayout>
 
-        <Button
+        <com.google.android.material.button.MaterialButton
             android:id="@+id/viewerClose"
+            style="@style/Widget.Material3.Button.TextButton"
             android:layout_width="wrap_content"
-            android:layout_height="wrap_content"
-            android:minHeight="48dp"
-            android:text="Cerrar" />
+            android:layout_height="48dp"
+            android:text="Cerrar"
+            android:textAllCaps="false"
+            android:textSize="13sp"
+            app:cornerRadius="16dp" />
     </LinearLayout>
 
     <LinearLayout
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
-        android:layout_marginHorizontal="12dp"
+        android:layout_marginStart="12dp"
+        android:layout_marginEnd="12dp"
         android:background="@drawable/bg_document_card"
+        android:elevation="2dp"
         android:orientation="vertical"
-        android:padding="8dp">
+        android:padding="10dp">
+
+        <TextView
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_marginStart="4dp"
+            android:layout_marginBottom="6dp"
+            android:text="ACCIONES INTELIGENTES"
+            android:textColor="@color/pocketscan_muted"
+            android:textSize="10sp"
+            android:textStyle="bold"
+            android:letterSpacing="0.1" />
 
         <LinearLayout
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
             android:orientation="horizontal">
-            <Button
+            <com.google.android.material.button.MaterialButton
                 android:id="@+id/viewerAi"
+                style="@style/Widget.Material3.Button.TonalButton"
                 android:layout_width="0dp"
-                android:layout_height="wrap_content"
+                android:layout_height="50dp"
                 android:layout_weight="1"
-                android:minHeight="48dp"
-                android:text="IA" />
-            <Button
+                android:text="IA"
+                android:textAllCaps="false"
+                android:textStyle="bold"
+                app:cornerRadius="15dp" />
+            <com.google.android.material.button.MaterialButton
                 android:id="@+id/viewerAsk"
+                style="@style/Widget.Material3.Button.TonalButton"
                 android:layout_width="0dp"
-                android:layout_height="wrap_content"
+                android:layout_height="50dp"
+                android:layout_marginStart="7dp"
                 android:layout_weight="1"
-                android:minHeight="48dp"
-                android:layout_marginStart="6dp"
-                android:text="Preguntar" />
+                android:text="Preguntar"
+                android:textAllCaps="false"
+                app:cornerRadius="15dp" />
         </LinearLayout>
 
         <LinearLayout
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
+            android:layout_marginTop="7dp"
             android:orientation="horizontal">
-            <Button
+            <com.google.android.material.button.MaterialButton
                 android:id="@+id/viewerCorrectOcr"
+                style="@style/Widget.Material3.Button.OutlinedButton"
                 android:layout_width="0dp"
-                android:layout_height="wrap_content"
+                android:layout_height="50dp"
                 android:layout_weight="1"
-                android:minHeight="48dp"
-                android:text="Corregir OCR" />
-            <Button
+                android:text="Corregir OCR"
+                android:textAllCaps="false"
+                app:cornerRadius="15dp" />
+            <com.google.android.material.button.MaterialButton
                 android:id="@+id/viewerExportText"
+                style="@style/Widget.Material3.Button.OutlinedButton"
                 android:layout_width="0dp"
-                android:layout_height="wrap_content"
+                android:layout_height="50dp"
+                android:layout_marginStart="7dp"
                 android:layout_weight="1"
-                android:minHeight="48dp"
-                android:layout_marginStart="6dp"
-                android:text="Exportar TXT" />
+                android:text="Exportar TXT"
+                android:textAllCaps="false"
+                app:cornerRadius="15dp" />
         </LinearLayout>
 
-        <Button
+        <com.google.android.material.button.MaterialButton
             android:id="@+id/viewerShare"
+            style="@style/Widget.Material3.Button.TextButton"
             android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            android:minHeight="48dp"
-            android:text="Compartir PDF" />
+            android:layout_height="46dp"
+            android:layout_marginTop="3dp"
+            android:text="Compartir PDF"
+            android:textAllCaps="false"
+            android:textStyle="bold"
+            app:cornerRadius="14dp" />
     </LinearLayout>
 
     <androidx.recyclerview.widget.RecyclerView
         android:id="@+id/pdfPagesRecycler"
         android:layout_width="match_parent"
         android:layout_height="0dp"
-        android:layout_marginTop="8dp"
+        android:layout_marginTop="10dp"
         android:layout_weight="1"
         android:clipToPadding="false"
         android:paddingStart="12dp"
         android:paddingTop="4dp"
         android:paddingEnd="12dp"
-        android:paddingBottom="12dp" />
+        android:paddingBottom="16dp" />
 </LinearLayout>
