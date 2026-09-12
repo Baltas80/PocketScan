@@ -4,14 +4,6 @@ import java.io.File
 
 /** Removes files left behind by interrupted scan/import operations. */
 object ScanStorageRecovery {
-    private val temporarySuffixes = setOf(
-        ".pdf.tmp",
-        ".txt.tmp",
-        ".ai.json.tmp",
-        ".improved.pdf",
-        ".original.pdf"
-    )
-
     fun cleanup(scansDir: File): Int {
         if (!scansDir.isDirectory) return 0
         var removed = 0
