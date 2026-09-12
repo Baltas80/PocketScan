@@ -2,13 +2,13 @@
 <resources>
     <color name="pocketscan_blue">#155EEF</color>
     <color name="pocketscan_blue_dark">#123A8C</color>
-    <color name="pocketscan_blue_soft">#EAF1FF</color>
+    <color name="pocketscan_blue_soft">#DCE8FF</color>
     <color name="pocketscan_text">#101828</color>
-    <color name="pocketscan_muted">#667085</color>
-    <color name="pocketscan_surface">#FFFFFF</color>
-    <color name="pocketscan_background">#F7F9FC</color>
-    <color name="pocketscan_hero">#F0F5FF</color>
-    <color name="pocketscan_border">#E4E7EC</color>
+    <color name="pocketscan_muted">#596579</color>
+    <color name="pocketscan_surface">#FBFCFE</color>
+    <color name="pocketscan_background">#E9EEF5</color>
+    <color name="pocketscan_hero">#DCE7F8</color>
+    <color name="pocketscan_border">#CDD5E1</color>
     <color name="pocketscan_success">#12B76A</color>
     <color name="pocketscan_navy">#0B1220</color>
     <color name="pocketscan_navy_soft">#111B2E</color>
