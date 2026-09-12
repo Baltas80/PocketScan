@@ -11,37 +11,41 @@ object AiMetadataStore {
 
     fun sidecarFor(document: File): File = File(document.parentFile ?: document, "${document.nameWithoutExtension}.ai.json")
 
-    fun save(document: File, analysis: AiDocumentAnalyzer.Analysis): Boolean = runCatching {
-        val sidecar = sidecarFor(document)
-        sidecar.parentFile?.mkdirs()
-        val fields = JSONObject()
-        analysis.fields.forEach { (key, value) -> fields.put(key, value) }
-        val json = JSONObject().put("version", VERSION).put("source", analysis.source).put("category", analysis.category)
-            .put("title", analysis.title).put("summary", analysis.summary).put("fields", fields)
-            .put("updatedAt", System.currentTimeMillis()).toString()
+    fun save(document: File, analysis: AiDocumentAnalyzer.Analysis): Boolean {
+        if (!document.isFile) return false
+        return runCatching {
+            val sidecar = sidecarFor(document)
+            sidecar.parentFile?.mkdirs()
+            val fields = JSONObject()
+            analysis.fields.forEach { (key, value) -> fields.put(key, value) }
+            val json = JSONObject().put("version", VERSION).put("source", analysis.source).put("category", analysis.category)
+                .put("title", analysis.title).put("summary", analysis.summary).put("fields", fields)
+                .put("updatedAt", System.currentTimeMillis()).toString()
 
-        val temp = File(sidecar.parentFile ?: document, sidecar.name + ".tmp")
-        temp.writeText(json, Charsets.UTF_8)
-        try {
+            val temp = File(sidecar.parentFile ?: document, sidecar.name + ".tmp")
+            temp.writeText(json, Charsets.UTF_8)
             try {
-                Files.move(
-                    temp.toPath(),
-                    sidecar.toPath(),
-                    StandardCopyOption.ATOMIC_MOVE,
-                    StandardCopyOption.REPLACE_EXISTING
-                )
-            } catch (_: AtomicMoveNotSupportedException) {
-                Files.move(
-                    temp.toPath(),
-                    sidecar.toPath(),
-                    StandardCopyOption.REPLACE_EXISTING
-                )
+                if (!document.isFile) return false
+                try {
+                    Files.move(
+                        temp.toPath(),
+                        sidecar.toPath(),
+                        StandardCopyOption.ATOMIC_MOVE,
+                        StandardCopyOption.REPLACE_EXISTING
+                    )
+                } catch (_: AtomicMoveNotSupportedException) {
+                    Files.move(
+                        temp.toPath(),
+                        sidecar.toPath(),
+                        StandardCopyOption.REPLACE_EXISTING
+                    )
+                }
+            } finally {
+                if (temp.exists()) temp.delete()
             }
-        } finally {
-            if (temp.exists()) temp.delete()
-        }
-        true
-    }.getOrDefault(false)
+            true
+        }.getOrDefault(false)
+    }
 
     fun load(document: File): AiDocumentAnalyzer.Analysis? = runCatching {
         val sidecar = sidecarFor(document)
