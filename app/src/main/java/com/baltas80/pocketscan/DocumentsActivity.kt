@@ -120,7 +120,9 @@ class DocumentsActivity : AppCompatActivity() {
                             val finalOcr = runCatching { finalText.takeIf { it.exists() }?.readText(Charsets.UTF_8).orEmpty() }.getOrDefault(ocrText)
                             val detected = DocumentOrganizer.categoryForText(finalOcr)
                             val finalPdf = DocumentOrganizer.moveDocument(renamedPdf, finalText.takeIf { it.exists() }, scansDir, detected)
-                            Triple(detected, finalPdf, finalPdf != renamedPdf || renamedPdf.exists())
+                            val targetDir = DocumentOrganizer.directory(scansDir, detected)
+                            val moveSucceeded = finalPdf.isFile && finalPdf.parentFile?.canonicalFile == targetDir.canonicalFile
+                            Triple(detected, finalPdf, moveSucceeded)
                         }
                         if (saved == null || !saved.third || !saved.second.isFile) {
                             pdf.delete(); text.delete(); Toast.makeText(this@DocumentsActivity, R.string.import_failed, Toast.LENGTH_LONG).show(); return@launch
