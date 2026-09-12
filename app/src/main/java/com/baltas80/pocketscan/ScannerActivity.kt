@@ -14,6 +14,7 @@ import android.widget.TextView
 import android.widget.Toast
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.appcompat.app.AppCompatActivity
+import androidx.camera.core.Camera
 import androidx.camera.core.CameraSelector
 import androidx.camera.core.ImageCapture
 import androidx.camera.core.ImageCaptureException
@@ -39,7 +40,10 @@ import kotlin.math.min
 class ScannerActivity : AppCompatActivity() {
     private lateinit var previewView: PreviewView
     private lateinit var hint: TextView
+    private lateinit var flashButton: Button
     private var imageCapture: ImageCapture? = null
+    private var camera: Camera? = null
+    private var flashEnabled = false
     private val capturedPages = mutableListOf<File>()
     private var busy = false
 
@@ -55,9 +59,12 @@ class ScannerActivity : AppCompatActivity() {
         setContentView(R.layout.activity_scanner)
         previewView = findViewById(R.id.previewView)
         hint = findViewById(R.id.scanHint)
+        flashButton = findViewById(R.id.flashButton)
+        flashButton.setOnClickListener { toggleFlash() }
         findViewById<Button>(R.id.captureButton).setOnClickListener { takePage() }
         findViewById<Button>(R.id.removeButton).setOnClickListener { removeLastPage() }
         findViewById<Button>(R.id.finishButton).setOnClickListener { finishPdf() }
+        flashButton.isEnabled = false
         if (ContextCompat.checkSelfPermission(this, Manifest.permission.CAMERA) == PackageManager.PERMISSION_GRANTED) startCamera()
         else permissionLauncher.launch(Manifest.permission.CAMERA)
     }
@@ -70,11 +77,28 @@ class ScannerActivity : AppCompatActivity() {
             imageCapture = ImageCapture.Builder().setCaptureMode(ImageCapture.CAPTURE_MODE_MINIMIZE_LATENCY).build()
             try {
                 provider.unbindAll()
-                provider.bindToLifecycle(this, CameraSelector.DEFAULT_BACK_CAMERA, preview, imageCapture)
+                camera = provider.bindToLifecycle(this, CameraSelector.DEFAULT_BACK_CAMERA, preview, imageCapture)
+                flashEnabled = false
+                flashButton.isEnabled = camera?.cameraInfo?.hasFlashUnit() == true
+                updateFlashButton()
             } catch (e: Exception) {
+                camera = null
+                flashButton.isEnabled = false
                 Toast.makeText(this, e.message ?: "Camera error", Toast.LENGTH_LONG).show()
             }
         }, ContextCompat.getMainExecutor(this))
+    }
+
+    private fun toggleFlash() {
+        val activeCamera = camera ?: return
+        if (!activeCamera.cameraInfo.hasFlashUnit()) return
+        flashEnabled = !flashEnabled
+        activeCamera.cameraControl.enableTorch(flashEnabled)
+        updateFlashButton()
+    }
+
+    private fun updateFlashButton() {
+        flashButton.text = if (flashEnabled) "Flash: encendido" else "Flash: apagado"
     }
 
     private fun takePage() {
