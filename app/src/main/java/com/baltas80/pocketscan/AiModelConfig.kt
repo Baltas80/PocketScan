@@ -15,7 +15,7 @@ import kotlinx.coroutines.suspendCancellableCoroutine
  */
 object AiModelConfig {
     private const val MODEL_NAME_KEY = "ai_model_name"
-    private const val DEFAULT_MODEL_NAME = "gemini-3.7-flash"
+    private const val DEFAULT_MODEL_NAME = "gemini-3.8-flash"
 
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
     @Volatile
