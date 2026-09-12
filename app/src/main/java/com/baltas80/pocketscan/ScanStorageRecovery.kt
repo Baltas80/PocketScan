@@ -12,7 +12,8 @@ object ScanStorageRecovery {
                 file.name.endsWith(".pdf.tmp", true) ||
                     file.name.endsWith(".txt.tmp", true) ||
                     file.name.endsWith(".ai.json.tmp", true) ||
-                    file.name.endsWith(".improved.pdf", true) -> {
+                    file.name.endsWith(".improved.pdf", true) ||
+                    file.name.matches(Regex("page_\\d{8}_\\d{6}_\\d{3}\\.jpg", RegexOption.IGNORE_CASE)) -> {
                     if (file.delete()) handled++
                 }
 
@@ -29,11 +30,4 @@ object ScanStorageRecovery {
         }
         return handled
     }
-
-    private fun isRecoveryFile(file: File): Boolean =
-        file.name.endsWith(".pdf.tmp", true) ||
-            file.name.endsWith(".txt.tmp", true) ||
-            file.name.endsWith(".ai.json.tmp", true) ||
-            file.name.endsWith(".improved.pdf", true) ||
-            file.name.endsWith(".original.pdf", true)
 }
