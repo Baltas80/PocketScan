@@ -17,8 +17,8 @@
     </LinearLayout>
 
     <LinearLayout android:layout_width="match_parent" android:layout_height="wrap_content" android:layout_marginTop="18dp" android:orientation="horizontal">
-        <com.google.android.material.button.MaterialButton android:id="@+id/importButton" android:layout_width="0dp" android:layout_height="48dp" android:layout_weight="1" android:text="@string/import_images" android:textAllCaps="false" android:textSize="13sp" app:cornerRadius="16dp" />
-        <com.google.android.material.button.MaterialButton android:id="@+id/aiLibraryButton" style="@style/Widget.Material3.Button.TonalButton" android:layout_width="0dp" android:layout_height="48dp" android:layout_marginStart="8dp" android:layout_weight="1" android:text="@string/ask_my_documents" android:textAllCaps="false" android:textSize="13sp" app:cornerRadius="16dp" />
+        <com.google.android.material.button.MaterialButton android:id="@+id/importButton" android:layout_width="0dp" android:layout_height="56dp" android:layout_weight="1" android:text="@string/import_images" android:textAllCaps="false" android:textSize="12sp" app:cornerRadius="16dp" />
+        <com.google.android.material.button.MaterialButton android:id="@+id/aiLibraryButton" style="@style/Widget.Material3.Button.TonalButton" android:layout_width="0dp" android:layout_height="56dp" android:layout_marginStart="8dp" android:layout_weight="1" android:text="@string/ask_my_documents" android:textAllCaps="false" android:textSize="12sp" app:cornerRadius="16dp" />
     </LinearLayout>
 
     <com.google.android.material.textfield.TextInputLayout android:layout_width="match_parent" android:layout_height="wrap_content" android:layout_marginTop="14dp" style="@style/Widget.Material3.TextInputLayout.OutlinedBox">
