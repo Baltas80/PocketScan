@@ -71,10 +71,16 @@ class SmartScannerActivity : AppCompatActivity() {
                 val pdfFile = File(dir, "document_$stamp.pdf")
                 val textFile = File(dir, "document_$stamp.txt")
                 val pageDir = File(cacheDir, "scan-pages-$stamp").apply { mkdirs() }
+                val tempPdf = File(dir, pdfFile.name + ".tmp")
                 try {
                     contentResolver.openInputStream(pdfUri).use { input ->
                         requireNotNull(input) { "No se pudo abrir el PDF" }
-                        FileOutputStream(pdfFile).use { output -> input.copyTo(output) }
+                        FileOutputStream(tempPdf).use { output -> input.copyTo(output) }
+                    }
+                    try {
+                        Files.move(tempPdf.toPath(), pdfFile.toPath(), StandardCopyOption.ATOMIC_MOVE, StandardCopyOption.REPLACE_EXISTING)
+                    } catch (_: java.nio.file.AtomicMoveNotSupportedException) {
+                        Files.move(tempPdf.toPath(), pdfFile.toPath(), StandardCopyOption.REPLACE_EXISTING)
                     }
 
                     val enhancedPages = pages.mapIndexed { index, page ->
@@ -104,9 +110,11 @@ class SmartScannerActivity : AppCompatActivity() {
 
                     Triple(dir, pdfFile, textFile to enhancedPages)
                 } catch (error: Exception) {
-                    pdfFile.delete(); textFile.delete()
+                    tempPdf.delete(); pdfFile.delete(); textFile.delete()
                     pageDir.deleteRecursively()
                     null
+                } finally {
+                    tempPdf.delete()
                 }
             }
             if (prepared == null) {
