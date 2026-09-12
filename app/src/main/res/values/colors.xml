@@ -1,11 +1,13 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
-    <color name="pocketscan_blue">#146EF5</color>
-    <color name="pocketscan_blue_dark">#0B3D91</color>
-    <color name="pocketscan_blue_soft">#EAF2FF</color>
-    <color name="pocketscan_text">#14213D</color>
-    <color name="pocketscan_muted">#64748B</color>
+    <color name="pocketscan_blue">#155EEF</color>
+    <color name="pocketscan_blue_dark">#123A8C</color>
+    <color name="pocketscan_blue_soft">#EAF1FF</color>
+    <color name="pocketscan_text">#101828</color>
+    <color name="pocketscan_muted">#667085</color>
     <color name="pocketscan_surface">#FFFFFF</color>
-    <color name="pocketscan_background">#F6F8FC</color>
-    <color name="pocketscan_success">#1FA774</color>
+    <color name="pocketscan_background">#F7F9FC</color>
+    <color name="pocketscan_hero">#F0F5FF</color>
+    <color name="pocketscan_border">#E4E7EC</color>
+    <color name="pocketscan_success">#12B76A</color>
 </resources>
