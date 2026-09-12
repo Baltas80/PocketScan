@@ -29,8 +29,19 @@ object DocumentImageEnhancer {
             val enhanced = enhance(bitmap)
             try {
                 output.parentFile?.mkdirs()
-                FileOutputStream(output).use { stream ->
-                    if (!enhanced.compress(Bitmap.CompressFormat.JPEG, 94, stream)) return false
+                val temp = File(output.parentFile, "${output.name}.tmp")
+                try {
+                    FileOutputStream(temp).use { stream ->
+                        if (!enhanced.compress(Bitmap.CompressFormat.JPEG, 94, stream)) return false
+                        stream.fd.sync()
+                    }
+                    if (!temp.renameTo(output)) {
+                        if (output.exists() && !output.delete()) return false
+                        if (!temp.renameTo(output)) return false
+                    }
+                    true
+                } finally {
+                    temp.delete()
                 }
             } finally {
                 enhanced.recycle()
@@ -38,7 +49,6 @@ object DocumentImageEnhancer {
         } finally {
             bitmap.recycle()
         }
-        true
     }.getOrElse { false }
 
     private fun decodeForEnhancement(context: Context, uri: Uri): Bitmap? {
@@ -131,8 +141,20 @@ object DocumentImageEnhancer {
                 }
             }
             output.parentFile?.mkdirs()
-            FileOutputStream(output).use { document.writeTo(it) }
-            true
+            val temp = File(output.parentFile, "${output.name}.tmp")
+            try {
+                FileOutputStream(temp).use { stream ->
+                    document.writeTo(stream)
+                    stream.fd.sync()
+                }
+                if (!temp.renameTo(output)) {
+                    if (output.exists() && !output.delete()) return false
+                    if (!temp.renameTo(output)) return false
+                }
+                true
+            } finally {
+                temp.delete()
+            }
         } finally {
             document.close()
         }
