@@ -3,7 +3,7 @@ package com.baltas80.pocketscan
 import android.app.Application
 import com.google.firebase.FirebaseApp
 import com.google.firebase.appcheck.FirebaseAppCheck
-import com.google.firebase.appcheck.PlayIntegrityAppCheckProviderFactory
+import com.google.firebase.appcheck.playintegrity.PlayIntegrityAppCheckProviderFactory
 import java.io.File
 
 class PocketScanApplication : Application() {
