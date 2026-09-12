@@ -28,6 +28,7 @@ import com.google.mlkit.vision.text.TextRecognition
 import com.google.mlkit.vision.text.latin.TextRecognizerOptions
 import java.io.File
 import java.io.FileOutputStream
+import java.net.URI
 import java.nio.file.Files
 import java.nio.file.StandardCopyOption
 import java.text.Normalizer
@@ -161,7 +162,7 @@ class ScannerActivity : AppCompatActivity() {
                         return@runOcr
                     }
                 }
-                pages.forEach { it.delete() }
+                cleanupCapturedPages(pages)
                 capturedPages.clear()
                 busy = false
                 AiAnalysisScheduler.enqueue(this, finalPdf)
@@ -170,6 +171,8 @@ class ScannerActivity : AppCompatActivity() {
             }, onFailure = {
                 pdf.delete()
                 text.delete()
+                cleanupCapturedPages(pages)
+                capturedPages.clear()
                 busy = false
                 updatePageStatus()
                 Toast.makeText(this, "No se pudo guardar el texto OCR", Toast.LENGTH_LONG).show()
@@ -177,9 +180,17 @@ class ScannerActivity : AppCompatActivity() {
         } catch (e: Exception) {
             pdf.delete()
             text.delete()
+            cleanupCapturedPages(pages)
+            capturedPages.clear()
             busy = false
             updatePageStatus()
             Toast.makeText(this, e.message ?: "No se pudo crear el PDF", Toast.LENGTH_LONG).show()
+        }
+    }
+
+    private fun cleanupCapturedPages(pages: List<File>) {
+        pages.forEach { page ->
+            runCatching { if (page.isFile) page.delete() }
         }
     }
 
