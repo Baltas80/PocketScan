@@ -1,73 +1,31 @@
 <LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
     android:layout_width="match_parent"
     android:layout_height="match_parent"
     android:orientation="vertical"
     android:background="@color/pocketscan_background"
     android:paddingStart="20dp"
-    android:paddingTop="24dp"
+    android:paddingTop="22dp"
     android:paddingEnd="20dp">
 
-    <TextView
-        android:layout_width="match_parent"
-        android:layout_height="wrap_content"
-        android:text="@string/my_documents"
-        android:textColor="@color/pocketscan_text"
-        android:textSize="28sp"
-        android:textStyle="bold" />
-
-    <TextView
-        android:layout_width="match_parent"
-        android:layout_height="wrap_content"
-        android:layout_marginTop="4dp"
-        android:text="@string/tagline"
-        android:textColor="@color/pocketscan_muted"
-        android:textSize="14sp" />
-
-    <LinearLayout
-        android:layout_width="match_parent"
-        android:layout_height="wrap_content"
-        android:layout_marginTop="20dp"
-        android:orientation="horizontal">
-        <Button
-            android:id="@+id/importButton"
-            android:layout_width="0dp"
-            android:layout_height="wrap_content"
-            android:layout_weight="1"
-            android:text="@string/import_images" />
-        <Button
-            android:id="@+id/aiLibraryButton"
-            android:layout_width="0dp"
-            android:layout_height="wrap_content"
-            android:layout_marginStart="8dp"
-            android:layout_weight="1"
-            android:text="@string/ask_my_documents" />
+    <LinearLayout android:layout_width="match_parent" android:layout_height="wrap_content" android:gravity="center_vertical" android:orientation="horizontal">
+        <LinearLayout android:layout_width="0dp" android:layout_height="wrap_content" android:layout_weight="1" android:orientation="vertical">
+            <TextView android:layout_width="match_parent" android:layout_height="wrap_content" android:text="@string/my_documents" android:textColor="@color/pocketscan_text" android:textSize="28sp" android:textStyle="bold" />
+            <TextView android:layout_width="match_parent" android:layout_height="wrap_content" android:layout_marginTop="3dp" android:text="@string/documents_subtitle" android:textColor="@color/pocketscan_muted" android:textSize="13sp" />
+        </LinearLayout>
+        <TextView android:layout_width="wrap_content" android:layout_height="wrap_content" android:text="PDF" android:textColor="@color/pocketscan_blue_dark" android:textSize="12sp" android:textStyle="bold" android:background="@drawable/bg_pill_blue" android:paddingStart="12dp" android:paddingEnd="12dp" android:paddingTop="7dp" android:paddingBottom="7dp" />
     </LinearLayout>
 
-    <EditText
-        android:id="@+id/searchInput"
-        android:layout_width="match_parent"
-        android:layout_height="wrap_content"
-        android:layout_marginTop="12dp"
-        android:backgroundTint="@color/pocketscan_blue"
-        android:hint="@string/search_documents"
-        android:inputType="text"
-        android:singleLine="true"
-        android:textColor="@color/pocketscan_text"
-        android:textColorHint="@color/pocketscan_muted" />
+    <LinearLayout android:layout_width="match_parent" android:layout_height="wrap_content" android:layout_marginTop="18dp" android:orientation="horizontal">
+        <com.google.android.material.button.MaterialButton android:id="@+id/importButton" android:layout_width="0dp" android:layout_height="48dp" android:layout_weight="1" android:text="@string/import_images" android:textAllCaps="false" android:textSize="13sp" app:cornerRadius="16dp" />
+        <com.google.android.material.button.MaterialButton android:id="@+id/aiLibraryButton" style="@style/Widget.Material3.Button.TonalButton" android:layout_width="0dp" android:layout_height="48dp" android:layout_marginStart="8dp" android:layout_weight="1" android:text="@string/ask_my_documents" android:textAllCaps="false" android:textSize="13sp" app:cornerRadius="16dp" />
+    </LinearLayout>
 
-    <Spinner
-        android:id="@+id/categorySpinner"
-        android:layout_width="match_parent"
-        android:layout_height="wrap_content"
-        android:layout_marginTop="4dp"
-        android:contentDescription="@string/filter_category" />
+    <com.google.android.material.textfield.TextInputLayout android:layout_width="match_parent" android:layout_height="wrap_content" android:layout_marginTop="14dp" style="@style/Widget.Material3.TextInputLayout.OutlinedBox">
+        <com.google.android.material.textfield.TextInputEditText android:id="@+id/searchInput" android:layout_width="match_parent" android:layout_height="52dp" android:hint="@string/search_documents" android:inputType="text" android:singleLine="true" android:textSize="14sp" />
+    </com.google.android.material.textfield.TextInputLayout>
 
-    <androidx.recyclerview.widget.RecyclerView
-        android:id="@+id/documentsRecycler"
-        android:layout_width="match_parent"
-        android:layout_height="0dp"
-        android:layout_weight="1"
-        android:layout_marginTop="8dp"
-        android:clipToPadding="false"
-        android:paddingBottom="12dp" />
+    <Spinner android:id="@+id/categorySpinner" android:layout_width="match_parent" android:layout_height="48dp" android:layout_marginTop="5dp" android:contentDescription="@string/filter_category" android:background="@drawable/bg_document_card" />
+
+    <androidx.recyclerview.widget.RecyclerView android:id="@+id/documentsRecycler" android:layout_width="match_parent" android:layout_height="0dp" android:layout_weight="1" android:layout_marginTop="10dp" android:clipToPadding="false" android:paddingBottom="16dp" />
 </LinearLayout>
