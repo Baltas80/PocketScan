@@ -54,6 +54,7 @@ dependencies {
     implementation("com.google.android.gms:play-services-mlkit-text-recognition-japanese:16.0.1")
     implementation("com.google.android.gms:play-services-mlkit-text-recognition-korean:16.0.1")
     implementation("com.google.android.gms:play-services-mlkit-document-scanner:16.0.0")
+    implementation("com.google.android.gms:play-services-ads:25.4.0")
 
     // Gemini through Firebase AI Logic.
     implementation(platform("com.google.firebase:firebase-bom:34.18.0"))
