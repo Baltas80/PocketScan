@@ -113,6 +113,7 @@ class ScannerActivity : AppCompatActivity() {
             ContextCompat.getMainExecutor(this),
             object : ImageCapture.OnImageSavedCallback {
                 override fun onError(exception: ImageCaptureException) {
+                    photo.delete()
                     busy = false
                     Toast.makeText(this@ScannerActivity, exception.message ?: "Capture failed", Toast.LENGTH_LONG).show()
                 }
@@ -254,6 +255,7 @@ class ScannerActivity : AppCompatActivity() {
 
     private fun createPdf(files: List<File>, pdfFile: File) {
         val document = PdfDocument()
+        val tempPdf = File(pdfFile.parentFile ?: pdfFile, pdfFile.name + ".tmp")
         try {
             files.forEachIndexed { index, file ->
                 val source = decodeBitmapForPdf(file) ?: error("No se pudo leer la imagen")
@@ -282,8 +284,16 @@ class ScannerActivity : AppCompatActivity() {
                     source.recycle()
                 }
             }
-            FileOutputStream(pdfFile).use { document.writeTo(it) }
-        } finally { document.close() }
+            FileOutputStream(tempPdf).use { document.writeTo(it) }
+            try {
+                Files.move(tempPdf.toPath(), pdfFile.toPath(), StandardCopyOption.ATOMIC_MOVE, StandardCopyOption.REPLACE_EXISTING)
+            } catch (_: java.nio.file.AtomicMoveNotSupportedException) {
+                Files.move(tempPdf.toPath(), pdfFile.toPath(), StandardCopyOption.REPLACE_EXISTING)
+            }
+        } finally {
+            document.close()
+            if (tempPdf.exists()) tempPdf.delete()
+        }
     }
 
     private fun decodeBitmapForPdf(file: File): Bitmap? {
