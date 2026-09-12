@@ -10,4 +10,9 @@
     <color name="pocketscan_hero">#F0F5FF</color>
     <color name="pocketscan_border">#E4E7EC</color>
     <color name="pocketscan_success">#12B76A</color>
+    <color name="pocketscan_navy">#0B1220</color>
+    <color name="pocketscan_navy_soft">#111B2E</color>
+    <color name="pocketscan_gold">#C99A3E</color>
+    <color name="pocketscan_gold_soft">#F8F0DF</color>
+    <color name="pocketscan_overlay">#CC0B1220</color>
 </resources>
