@@ -15,7 +15,7 @@ object ScanStorageRecovery {
                     file.name.endsWith(".jpg.tmp", true) ||
                     file.name.endsWith(".improved.pdf", true) ||
                     file.name.matches(Regex("page_\\d{8}_\\d{6}_\\d{3}\\.jpg", RegexOption.IGNORE_CASE)) ||
-                    file.name.matches(Regex("import_\\d+_\\d+\\.jpg", RegexOption.IGNORE_CASE)) -> {
+                    (file.name.startsWith("import_", true) && file.name.endsWith(".jpg", true)) -> {
                     if (file.delete()) handled++
                 }
 
