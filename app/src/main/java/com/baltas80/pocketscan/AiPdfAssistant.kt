@@ -24,6 +24,14 @@ object AiPdfAssistant {
             "Este PDF supera el límite de análisis IA directo."
         }
 
+        // Monetary totals must be deterministic. Cloud AI can otherwise answer with a
+        // plausible product price even when the OCR contains an explicit TOTAL row.
+        // Resolve these questions locally from OCR before contacting the model.
+        val normalizedQuestion = normalize(question)
+        if (normalizedQuestion.contains("total") || normalizedQuestion.contains("importe")) {
+            return@withContext flow { emit(localAnswer(question, ocrText)) }
+        }
+
         val prompt = content {
             inlineData(file.readBytes(), "application/pdf")
             text("""
