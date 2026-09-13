@@ -41,6 +41,8 @@ object AiLibraryAssistant {
             Answer ONLY from the structured library results supplied below. Never invent facts.
             Respect the filters already applied by the local query engine.
             If an aggregate total is supplied, use it exactly and do not recalculate it from unrelated values.
+            VERIFIED_TOTAL is authoritative when present: it was extracted from a line explicitly labelled as the document total in the local OCR.
+            When the user asks for a total, never substitute an item price, subtotal, tax amount, or another monetary value.
             You may summarize, compare, count, and identify dates, suppliers, clients, categories and amounts.
             Respond in the user's language: $language. Keep the answer concise and useful.
 
@@ -50,7 +52,9 @@ object AiLibraryAssistant {
             STRUCTURED LIBRARY RESULTS:
             $context
         """.trimIndent()
-        model.generateContent(prompt).text?.trim()?.takeIf { it.isNotBlank() } ?: error("AI returned no answer")
+        val answer = model.generateContent(prompt).text?.trim()?.takeIf { it.isNotBlank() }
+            ?: error("AI returned no answer")
+        "Gemini conectado\n\n$answer"
     }
 
     private fun localAnswer(
@@ -63,7 +67,7 @@ object AiLibraryAssistant {
         val asksCount = normalizedQuestion.contains("cuantas") || normalizedQuestion.contains("cuantos") || normalizedQuestion.contains("cantidad") || normalizedQuestion.contains("count") || normalizedQuestion.contains("how many")
 
         if (asksCount) {
-            return when (language) {
+            val answer = when (language) {
                 "es" -> "Hay ${result.matches.size} documento${if (result.matches.size == 1) "" else "s"} que coincide${if (result.matches.size == 1) "" else "n"} con la consulta."
                 "fr" -> "Il y a ${result.matches.size} document${if (result.matches.size == 1) "" else "s"} correspondant à la recherche."
                 "de" -> "Es gibt ${result.matches.size} passende Dokumente."
@@ -72,18 +76,36 @@ object AiLibraryAssistant {
                 "ca" -> "Hi ha ${result.matches.size} document${if (result.matches.size == 1) "" else "s"} que coincideix${if (result.matches.size == 1) "" else "en"} amb la consulta."
                 else -> "There are ${result.matches.size} matching documents."
             }
+            return localPrefix(language) + answer
         }
 
-        if (asksTotal && result.aggregateTotal != null && result.aggregateCurrency != null) {
-            val formatted = "%.2f".format(Locale.US, result.aggregateTotal)
-            return when (language) {
-                "es" -> "Total de los ${result.matches.size} documentos encontrados: $formatted ${result.aggregateCurrency}."
-                "fr" -> "Total des ${result.matches.size} documents trouvés : $formatted ${result.aggregateCurrency}."
-                "de" -> "Gesamtsumme der ${result.matches.size} gefundenen Dokumente: $formatted ${result.aggregateCurrency}."
-                "it" -> "Totale dei ${result.matches.size} documenti trovati: $formatted ${result.aggregateCurrency}."
-                "pt" -> "Total dos ${result.matches.size} documentos encontrados: $formatted ${result.aggregateCurrency}."
-                "ca" -> "Total dels ${result.matches.size} documents trobats: $formatted ${result.aggregateCurrency}."
-                else -> "Total for the ${result.matches.size} matching documents: $formatted ${result.aggregateCurrency}."
+        if (asksTotal) {
+            if (result.aggregateTotal != null && result.aggregateCurrency != null) {
+                val formatted = "%.2f".format(Locale.US, result.aggregateTotal)
+                val answer = when (language) {
+                    "es" -> "Total de los ${result.matches.size} documentos encontrados: $formatted ${result.aggregateCurrency}."
+                    "fr" -> "Total des ${result.matches.size} documents trouvés : $formatted ${result.aggregateCurrency}."
+                    "de" -> "Gesamtsumme der ${result.matches.size} gefundenen Dokumente: $formatted ${result.aggregateCurrency}."
+                    "it" -> "Totale dei ${result.matches.size} documenti trovati: $formatted ${result.aggregateCurrency}."
+                    "pt" -> "Total dos ${result.matches.size} documentos encontrados: $formatted ${result.aggregateCurrency}."
+                    "ca" -> "Total dels ${result.matches.size} documents trobats: $formatted ${result.aggregateCurrency}."
+                    else -> "Total for the ${result.matches.size} matching documents: $formatted ${result.aggregateCurrency}."
+                }
+                return localPrefix(language) + answer
+            }
+
+            if (result.matches.size == 1) {
+                val match = result.matches.single()
+                val total = match.total
+                if (total != null) {
+                    val formatted = "%.2f".format(Locale.US, total)
+                    val amount = match.currency?.takeIf { it.isNotBlank() }?.let { "$formatted $it" } ?: formatted
+                    val answer = when (language) {
+                        "es" -> "Importe total del documento: $amount."
+                        else -> "Document total: $amount."
+                    }
+                    return localPrefix(language) + answer
+                }
             }
         }
 
@@ -100,7 +122,10 @@ object AiLibraryAssistant {
             val analysis = match.analysis
             val title = analysis?.title?.takeIf { it.isNotBlank() } ?: match.file.nameWithoutExtension
             val category = analysis?.category?.takeIf { it.isNotBlank() }
-            val total = analysis?.fields?.get("total")?.takeIf { it.isNotBlank() }
+            val total = match.total?.let { amount ->
+                val formatted = "%.2f".format(Locale.US, amount)
+                match.currency?.takeIf { it.isNotBlank() }?.let { "$formatted $it" } ?: formatted
+            }
             buildString {
                 append(index + 1).append(". ").append(title)
                 category?.let { append(" — ").append(it) }
@@ -108,6 +133,16 @@ object AiLibraryAssistant {
             }
         }.joinToString("\n")
         return "$heading\n\n$lines"
+    }
+
+    private fun localPrefix(language: String): String = when (language) {
+        "es" -> "Modo local — Gemini no disponible\n\n"
+        "fr" -> "Mode local — Gemini indisponible\n\n"
+        "de" -> "Lokaler Modus — Gemini nicht verfügbar\n\n"
+        "it" -> "Modalità locale — Gemini non disponibile\n\n"
+        "pt" -> "Modo local — Gemini indisponível\n\n"
+        "ca" -> "Mode local — Gemini no disponible\n\n"
+        else -> "Local mode — Gemini unavailable\n\n"
     }
 
     private fun noDocumentsMessage(): String = when (languageCode()) {
