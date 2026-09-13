@@ -39,12 +39,14 @@ object AiMetadataStore {
     }
 
     fun load(document: File): AiDocumentAnalyzer.Analysis? = runCatching {
+        if (!document.isFile) return null
+
         val sidecar = sidecarFor(document)
-        if (!sidecar.isFile) return null
-        val json = JSONObject(sidecar.readText(Charsets.UTF_8))
-        val fieldsJson = json.optJSONObject("fields")
+        val json = if (sidecar.isFile) JSONObject(sidecar.readText(Charsets.UTF_8)) else null
         val fields = linkedMapOf<String, String>()
-        fieldsJson?.keys()?.forEach { key -> fieldsJson.optString(key).trim().takeIf { it.isNotEmpty() }?.let { fields[key] = it } }
+        json?.optJSONObject("fields")?.keys()?.forEach { key ->
+            json.optJSONObject("fields")?.optString(key)?.trim()?.takeIf { it.isNotEmpty() }?.let { fields[key] = it }
+        }
 
         val ocr = File(document.parentFile ?: document, "${document.nameWithoutExtension}.txt")
         val verified = if (ocr.isFile) findExplicitTotal(ocr.readText(Charsets.UTF_8)) else null
@@ -53,11 +55,12 @@ object AiMetadataStore {
             verified.second?.let { fields["moneda"] = it }
         }
 
-        val source = json.optString("source", "local") + if (verified != null) "+ocr-verified" else ""
+        val baseSource = json?.optString("source", "local") ?: "ocr"
+        val source = baseSource + if (verified != null) "+ocr-verified" else ""
         AiDocumentAnalyzer.Analysis(
-            json.optString("category", DocumentOrganizer.GENERAL),
-            json.optString("title", document.nameWithoutExtension),
-            json.optString("summary", ""),
+            json?.optString("category", DocumentOrganizer.GENERAL) ?: DocumentOrganizer.GENERAL,
+            json?.optString("title", document.nameWithoutExtension) ?: document.nameWithoutExtension,
+            json?.optString("summary", "") ?: "",
             fields,
             source
         )
