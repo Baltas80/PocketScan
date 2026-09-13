@@ -3,6 +3,7 @@
     <uses-feature android:name="android.hardware.camera" android:required="false" />
     <uses-permission android:name="android.permission.CAMERA" />
     <uses-permission android:name="android.permission.USE_BIOMETRIC" />
+    <uses-permission android:name="com.google.android.gms.permission.AD_ID" />
     <application
         android:name=".PocketScanApplication"
         android:allowBackup="false"
