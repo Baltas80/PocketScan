@@ -119,19 +119,19 @@ object AiPdfAssistant {
     private data class AmountMatch(val amount: String, val currency: String?)
 
     /**
-     * Extracts an amount only from a line explicitly labelled as the document total.
-     * This prevents the old fallback from mistaking the first product price for the total.
+     * Extracts an amount from a line explicitly labelled as the document total.
+     * It tolerates receipt-style dotted leaders, colons and spacing between the
+     * TOTAL label and the value, while never using an unrelated product price.
      */
     private fun findDocumentTotal(ocrText: String): AmountMatch? {
-        val totalLabel = Regex("(?i)^\\s*(?:total|total a pagar|importe total|importe final|total general)\\b")
+        val totalLabel = Regex("(?i)^\\s*(?:total(?:\\s+a\\s+pagar)?|importe\\s+(?:total|final)|total\\s+general)\\s*(?:[.·:_-]\\s*)*")
         val amountPattern = Regex("(?i)([0-9]{1,3}(?:[.,][0-9]{3})*(?:[.,][0-9]{1,2})|[0-9]+(?:[.,][0-9]{1,2}))(?:\\s*(€|EUR|USD|\\$|GBP|£))?\\s*$")
         val currencyPattern = Regex("(?i)(€|EUR|USD|\\$|GBP|£)")
 
         for (line in ocrText.lineSequence()) {
             val clean = line.trim()
-            if (!totalLabel.containsMatchIn(clean)) continue
-
-            val suffix = clean.substringAfter(totalLabel.find(clean)?.value ?: "", "").trim()
+            val labelMatch = totalLabel.find(clean) ?: continue
+            val suffix = clean.substring(labelMatch.range.last + 1).trim()
             val amount = amountPattern.find(suffix)
             if (amount != null) {
                 val value = amount.groupValues[1]
