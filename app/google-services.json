@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "96499348248",
+    "project_id": "pocketscan-45fbc",
+    "storage_bucket": "pocketscan-45fbc.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:96499348248:android:5a3a0e57df21db9ff2646d",
+        "android_client_info": {
+          "package_name": "com.baltas80.pocketscan"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyCFRUy6DCl0Vbkcs77eqZNpHAMdawdesH8"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}
