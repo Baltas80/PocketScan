@@ -15,9 +15,9 @@ class AiLibraryQueryEngineTest {
         try {
             val pdf = File(dir, "scan.pdf").apply { writeText("pdf") }
             File(dir, "scan.txt").writeText("Factura Acme 2025")
-            File(dir, "notes.txt").writeText("Factura Acme 2025")
+            val notes = File(dir, "notes.txt").apply { writeText("Factura Acme 2025") }
 
-            val result = AiLibraryQueryEngine.query("Acme", listOf(pdf, File(dir, "notes.txt")))
+            val result = AiLibraryQueryEngine.query("Acme", listOf(pdf, notes))
 
             assertEquals(1, result.matches.size)
             assertEquals(pdf, result.matches.single().file)
@@ -71,6 +71,29 @@ class AiLibraryQueryEngineTest {
             val mixed = AiLibraryQueryEngine.query("total", listOf(first, dollars))
             assertNull(mixed.aggregateTotal)
             assertNull(mixed.aggregateCurrency)
+        } finally {
+            dir.deleteRecursively()
+        }
+    }
+
+    @Test
+    fun ocrTotalSplitAcrossLinesOverridesAiTotal() {
+        val dir = tempDir()
+        try {
+            val pdf = document(dir, "ticket.pdf", "5,00 EUR")
+            File(dir, "ticket.txt").writeText("""
+                BARRA PRECOC 235G 3,80
+                5,00 x 0,76
+                PAN MOLDE ALTEZA 1,19
+                TOTAL
+                17,79
+            """.trimIndent())
+
+            val result = AiLibraryQueryEngine.query("total", listOf(pdf))
+
+            assertEquals(1, result.matches.size)
+            assertEquals(17.79, result.matches.single().total!!, 0.001)
+            assertEquals("EUR", result.matches.single().currency)
         } finally {
             dir.deleteRecursively()
         }
