@@ -1,18 +1,18 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
-    <color name="pocketscan_blue">#4D8DFF</color>
-    <color name="pocketscan_blue_dark">#2F6FE4</color>
-    <color name="pocketscan_blue_soft">#1A315B</color>
-    <color name="pocketscan_text">#F5F7FB</color>
-    <color name="pocketscan_muted">#AAB6C8</color>
-    <color name="pocketscan_surface">#151F32</color>
-    <color name="pocketscan_background">#080F1D</color>
-    <color name="pocketscan_hero">#102A50</color>
-    <color name="pocketscan_border">#293853</color>
-    <color name="pocketscan_success">#36D399</color>
-    <color name="pocketscan_navy">#080F1D</color>
-    <color name="pocketscan_navy_soft">#111A2B</color>
-    <color name="pocketscan_gold">#D6A94A</color>
-    <color name="pocketscan_gold_soft">#2B2415</color>
-    <color name="pocketscan_overlay">#CC080F1D</color>
+    <color name="pocketscan_blue">#3FA9FF</color>
+    <color name="pocketscan_blue_dark">#216FE8</color>
+    <color name="pocketscan_blue_soft">#102F5D</color>
+    <color name="pocketscan_text">#F7F9FF</color>
+    <color name="pocketscan_muted">#AAB9D1</color>
+    <color name="pocketscan_surface">#111D34</color>
+    <color name="pocketscan_background">#050B18</color>
+    <color name="pocketscan_hero">#102958</color>
+    <color name="pocketscan_border">#2A4670</color>
+    <color name="pocketscan_success">#38D9A2</color>
+    <color name="pocketscan_navy">#050B18</color>
+    <color name="pocketscan_navy_soft">#0B1427</color>
+    <color name="pocketscan_gold">#E0B45A</color>
+    <color name="pocketscan_gold_soft">#2A2416</color>
+    <color name="pocketscan_overlay">#CC050B18</color>
 </resources>
