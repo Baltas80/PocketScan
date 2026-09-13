@@ -20,6 +20,24 @@ object AiLibraryAssistant {
                 .toList()
             if (documents.isEmpty()) return@runCatching noDocumentsMessage()
 
+            // Totals are deterministic financial data. Resolve them directly from OCR before
+            // semantic filtering or Gemini so an item price can never replace the receipt total.
+            if (asksTotal(question)) {
+                val ocrTotals = documents.mapNotNull { file ->
+                    findReceiptTotalFromOcr(file)?.let { total -> file to total }
+                }
+                if (ocrTotals.size == 1) {
+                    return@runCatching exactOcrTotalAnswer(ocrTotals.single().second)
+                }
+                if (ocrTotals.size > 1) {
+                    val currencies = ocrTotals.mapNotNull { it.second.second }.distinct()
+                    if (currencies.size == 1) {
+                        val sum = ocrTotals.sumOf { it.second.first }
+                        return@runCatching exactOcrAggregateAnswer(sum, currencies.single(), ocrTotals.size)
+                    }
+                }
+            }
+
             val queryResult = AiLibraryQueryEngine.query(question, documents)
             if (queryResult.matches.isEmpty()) return@runCatching insufficientMessage(languageCode())
 
@@ -63,7 +81,7 @@ object AiLibraryAssistant {
     ): String {
         val language = languageCode()
         val normalizedQuestion = normalize(question)
-        val asksTotal = normalizedQuestion.contains("total") || normalizedQuestion.contains("cuanto") || normalizedQuestion.contains("suma") || normalizedQuestion.contains("sum")
+        val asksTotal = asksTotal(question)
         val asksCount = normalizedQuestion.contains("cuantas") || normalizedQuestion.contains("cuantos") || normalizedQuestion.contains("cantidad") || normalizedQuestion.contains("count") || normalizedQuestion.contains("how many")
 
         if (asksCount) {
@@ -135,6 +153,66 @@ object AiLibraryAssistant {
         return "$heading\n\n$lines"
     }
 
+    private fun asksTotal(question: String): Boolean {
+        val normalized = normalize(question)
+        return normalized.contains("total") || normalized.contains("cuanto") || normalized.contains("importe") || normalized.contains("suma") || normalized.contains("sum")
+    }
+
+    /**
+     * Receipt-specific deterministic resolver. It tolerates dot leaders such as
+     * `TOTAL ................ 23,02` and, if TOTAL is absent from OCR, uses a
+     * payment line such as `TARJETA ........ 23,02` as a conservative fallback.
+     */
+    private fun findReceiptTotalFromOcr(file: File): Pair<Double, String?>? {
+        val ocr = File(file.parentFile, "${file.nameWithoutExtension}.txt")
+        if (!ocr.isFile) return null
+        val text = runCatching { ocr.readText(Charsets.UTF_8) }.getOrNull() ?: return null
+        val explicitLabels = Regex("(?i)^\\s*(?:total(?:\\s+a\\s+pagar)?|importe\\s+(?:total|final)|total\\s+general|total\\s+factura)\\b")
+        val paymentLabels = Regex("(?i)^\\s*(?:tarjeta|pago(?:\\s+con)?|efectivo|card|payment)\\b")
+        val amount = Regex("([0-9]{1,3}(?:[.][0-9]{3})*(?:,[0-9]{1,2})|[0-9]+(?:[.,][0-9]{1,2}))(?:\\s*(€|EUR|USD|\\$|GBP|£))?\\s*$")
+        var paymentCandidate: Pair<Double, String?>? = null
+        for (line in text.lineSequence()) {
+            val clean = line.trim()
+            val match = amount.find(clean) ?: continue
+            val value = parseReceiptNumber(match.groupValues[1]) ?: continue
+            val currency = match.groupValues.getOrNull(2)?.takeIf { it.isNotBlank() }?.let(::normalizeCurrency)
+            when {
+                explicitLabels.containsMatchIn(clean) -> return value to currency
+                paymentLabels.containsMatchIn(clean) && paymentCandidate == null -> paymentCandidate = value to currency
+            }
+        }
+        return paymentCandidate
+    }
+
+    private fun parseReceiptNumber(value: String): Double? {
+        val s = value.replace(" ", "")
+        return runCatching {
+            when {
+                s.contains(',') && s.contains('.') -> if (s.lastIndexOf(',') > s.lastIndexOf('.')) s.replace(".", "").replace(',', '.') else s.replace(",", "")
+                s.count { it == ',' } == 1 && s.substringAfter(',').length <= 2 -> s.replace(',', '.')
+                s.count { it == '.' } > 1 -> s.replace(".", "")
+                else -> s
+            }.toDouble()
+        }.getOrNull()
+    }
+
+    private fun exactOcrTotalAnswer(total: Pair<Double, String?>): String {
+        val formatted = "%.2f".format(Locale.US, total.first)
+        val amount = total.second?.let { "$formatted $it" } ?: formatted
+        return when (languageCode()) {
+            "es" -> "Total verificado por OCR: $amount."
+            else -> "OCR-verified total: $amount."
+        }
+    }
+
+    private fun exactOcrAggregateAnswer(total: Double, currency: String, count: Int): String {
+        val formatted = "%.2f".format(Locale.US, total)
+        return when (languageCode()) {
+            "es" -> "Total verificado por OCR de los $count documentos: $formatted $currency."
+            else -> "OCR-verified total of $count documents: $formatted $currency."
+        }
+    }
+
     private fun localPrefix(language: String): String = when (language) {
         "es" -> "Modo local — Gemini no disponible\n\n"
         "fr" -> "Mode local — Gemini indisponible\n\n"
@@ -190,4 +268,11 @@ object AiLibraryAssistant {
         value.lowercase(Locale.ROOT),
         java.text.Normalizer.Form.NFD
     ).replace("\\p{InCombiningDiacriticalMarks}+".toRegex(), "")
+
+    private fun normalizeCurrency(value: String): String = when (value.uppercase(Locale.ROOT)) {
+        "€", "EUR" -> "EUR"
+        "$", "USD" -> "USD"
+        "£", "GBP" -> "GBP"
+        else -> value
+    }
 }
