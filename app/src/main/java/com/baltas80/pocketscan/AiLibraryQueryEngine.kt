@@ -166,18 +166,28 @@ object AiLibraryQueryEngine {
     }
 
     private fun findExplicitTotal(ocrText: String): Pair<String, String?>? {
+        val lines = ocrText.lineSequence().map { it.trim() }.filter { it.isNotBlank() }.toList()
         val label = Regex("(?i)^\\s*(?:total(?:\\s+a\\s+pagar)?|importe\\s+(?:total|final)|total\\s+general|total\\s+factura)\\b")
         val amount = Regex("(?i)([0-9]{1,3}(?:[.][0-9]{3})*(?:,[0-9]{1,2})|[0-9]+(?:[.,][0-9]{1,2}))(?:\\s*(€|EUR|USD|\\$|GBP|£))?\\s*$")
         val currency = Regex("(?i)(€|EUR|USD|\\$|GBP|£)")
-        for (line in ocrText.lineSequence()) {
-            val clean = line.trim()
-            if (!label.containsMatchIn(clean)) continue
-            val suffix = clean.substringAfter(label.find(clean)?.value ?: "", "").trim()
-            val match = amount.find(suffix) ?: continue
+
+        fun parseSuffix(suffix: String): Pair<String, String?>? {
+            val match = amount.find(suffix) ?: return null
             val value = match.groupValues[1]
             val unit = match.groupValues.getOrNull(2)?.takeIf { it.isNotBlank() }
                 ?: currency.find(suffix)?.groupValues?.getOrNull(1)
             return value to unit?.let { normalizeCurrency(it) }
+        }
+
+        lines.forEachIndexed { index, line ->
+            if (!label.containsMatchIn(line)) return@forEachIndexed
+            val labelMatch = label.find(line)
+            val suffix = line.substringAfter(labelMatch?.value ?: "", "").trim()
+            parseSuffix(suffix)?.let { return it }
+            for (offset in 1..2) {
+                val next = lines.getOrNull(index + offset) ?: break
+                parseSuffix(next)?.let { return it }
+            }
         }
         return null
     }
