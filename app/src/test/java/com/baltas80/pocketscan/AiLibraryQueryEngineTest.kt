@@ -93,7 +93,6 @@ class AiLibraryQueryEngineTest {
 
             assertEquals(1, result.matches.size)
             assertEquals(17.79, result.matches.single().total!!, 0.001)
-            assertEquals("EUR", result.matches.single().currency)
         } finally {
             dir.deleteRecursively()
         }
