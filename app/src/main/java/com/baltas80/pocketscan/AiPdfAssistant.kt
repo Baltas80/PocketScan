@@ -1,10 +1,17 @@
 package com.baltas80.pocketscan
 
+import android.graphics.Bitmap
+import android.graphics.pdf.PdfRenderer
+import android.os.ParcelFileDescriptor
+import com.google.android.gms.tasks.Tasks
 import com.google.firebase.Firebase
 import com.google.firebase.ai.GenerativeModel
 import com.google.firebase.ai.ai
 import com.google.firebase.ai.type.GenerativeBackend
 import com.google.firebase.ai.type.content
+import com.google.mlkit.vision.common.InputImage
+import com.google.mlkit.vision.text.TextRecognition
+import com.google.mlkit.vision.text.latin.TextRecognizerOptions
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.collect
@@ -17,16 +24,23 @@ import java.util.Locale
 object AiPdfAssistant {
     private const val MAX_INLINE_PDF_BYTES = 14_000_000L
     private const val MAX_OCR_CORRECTION_CHARS = 30000
+    private const val VISUAL_OCR_WIDTH = 1800
+    private const val VISUAL_OCR_MAX_PAGES = 3
+
+    @Volatile
+    private var currentDocumentFile: File? = null
 
     suspend fun answerStream(file: File, ocrText: String, question: String): Flow<String> = withContext(Dispatchers.IO) {
         require(file.isFile) { "Document not found" }
         require(file.length() <= MAX_INLINE_PDF_BYTES) {
             "Este PDF supera el límite de análisis IA directo."
         }
+        currentDocumentFile = file
 
         // Monetary totals must be deterministic. Cloud AI can otherwise answer with a
         // plausible product price even when the OCR contains an explicit TOTAL row.
-        // Resolve these questions locally from OCR before contacting the model.
+        // Resolve these questions locally from OCR, with a high-resolution visual OCR
+        // retry when the first OCR pass missed the total row entirely.
         val normalizedQuestion = normalize(question)
         if (normalizedQuestion.contains("total") || normalizedQuestion.contains("importe")) {
             return@withContext flow { emit(localAnswer(question, ocrText)) }
@@ -129,9 +143,11 @@ object AiPdfAssistant {
     /**
      * Receipt total extraction based on a proven open-source receipt-parser strategy:
      * explicit total labels first, adjacent-line recovery for OCR, then conservative
-     * payment-line and largest-amount fallbacks.
+     * payment-line and largest-amount fallbacks. If those fail, the PDF is rendered
+     * at higher resolution and OCR'd again so a missed TOTAL row cannot degrade to a
+     * product price such as `5,00`.
      */
-    private fun findDocumentTotal(ocrText: String): AmountMatch? {
+    private fun findDocumentTotal(ocrText: String, allowVisualRetry: Boolean = true): AmountMatch? {
         val lines = ocrText.lineSequence().map { it.trim() }.filter { it.isNotEmpty() }.toList()
         if (lines.isEmpty()) return null
 
@@ -182,8 +198,52 @@ object AiPdfAssistant {
             amountsOnLine(line).lastOrNull()?.let { return it }
         }
 
-        // 4. Last resort: largest two-decimal monetary amount in the OCR.
+        // If the original OCR missed the total row, do not accept a random product
+        // price yet. Re-render the PDF at a larger width and run ML Kit OCR locally.
+        if (allowVisualRetry) {
+            currentDocumentFile?.let { pdf ->
+                val visualOcr = runCatching { highResolutionOcr(pdf) }.getOrNull().orEmpty()
+                if (visualOcr.isNotBlank()) {
+                    findDocumentTotal(visualOcr, allowVisualRetry = false)?.let { return it }
+                }
+            }
+        }
+
+        // Last resort: largest two-decimal amount in the OCR. This is intentionally
+        // after the visual retry, because using it too early caused `5,00` to win.
         return lines.flatMap { amountsOnLine(it) }.maxByOrNull { parseReceiptNumber(it.amount) ?: Double.MIN_VALUE }
+    }
+
+    private fun highResolutionOcr(pdf: File): String {
+        val recognizer = TextRecognition.getClient(TextRecognizerOptions.DEFAULT_OPTIONS)
+        return try {
+            val output = StringBuilder()
+            ParcelFileDescriptor.open(pdf, ParcelFileDescriptor.MODE_READ_ONLY).use { descriptor ->
+                PdfRenderer(descriptor).use { renderer ->
+                    val pages = renderer.pageCount.coerceAtMost(VISUAL_OCR_MAX_PAGES)
+                    for (index in 0 until pages) {
+                        renderer.openPage(index).use { page ->
+                            val ratio = page.height.toFloat() / page.width.toFloat()
+                            val height = (VISUAL_OCR_WIDTH * ratio).toInt().coerceAtLeast(1)
+                            val bitmap = Bitmap.createBitmap(VISUAL_OCR_WIDTH, height, Bitmap.Config.ARGB_8888)
+                            try {
+                                page.render(bitmap, null, null, PdfRenderer.Page.RENDER_MODE_FOR_DISPLAY)
+                                val result = Tasks.await(recognizer.process(InputImage.fromBitmap(bitmap, 0)))
+                                if (result.text.isNotBlank()) {
+                                    if (output.isNotEmpty()) output.append("\n\n")
+                                    output.append(result.text)
+                                }
+                            } finally {
+                                bitmap.recycle()
+                            }
+                        }
+                    }
+                }
+            }
+            output.toString()
+        } finally {
+            recognizer.close()
+        }
     }
 
     private fun formatAmount(value: Double): String = "%.2f".format(Locale.US, value).replace('.', ',')
