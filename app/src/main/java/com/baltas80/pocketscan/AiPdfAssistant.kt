@@ -153,11 +153,8 @@ object AiPdfAssistant {
     private data class AmountMatch(val amount: String, val currency: String?)
 
     /**
-     * Receipt total extraction based on a proven open-source receipt-parser strategy:
-     * explicit total labels first, adjacent-line recovery for OCR, then conservative
-     * payment-line and largest-amount fallbacks. If those fail, the PDF is rendered
-     * at higher resolution and OCR'd again so a missed TOTAL row cannot degrade to a
-     * product price such as `5,00`.
+     * Receipt total extraction. Prefer an actual TOTAL row over product lines that
+     * happen to contain the word `TOTAL` as part of OCR ordering or item descriptions.
      */
     private fun findDocumentTotal(ocrText: String, allowVisualRetry: Boolean = true): AmountMatch? {
         val lines = ocrText.lineSequence().map { it.trim() }.filter { it.isNotEmpty() }.toList()
@@ -185,33 +182,46 @@ object AiPdfAssistant {
             parseReceiptNumber(match.value)?.let { value -> AmountMatch(formatAmount(value), currencyFromLine(line)) }
         }.toList()
 
-        fun keywordMatch(line: String, keywords: List<String>): Boolean {
-            val normalized = normalize(line)
-            return keywords.any { normalized.contains(normalize(it)) }
+        fun normalizedWords(line: String): List<String> = normalize(line)
+            .split(Regex("\\s+"))
+            .filter { it.isNotBlank() }
+
+        fun hasStandaloneKeyword(line: String, keywords: List<String>): Boolean {
+            val words = normalizedWords(line)
+            return keywords.any { keyword ->
+                val target = normalize(keyword).split(Regex("\\s+"))
+                if (target.size == 1) words.contains(target[0])
+                else words.windowed(target.size).any { it == target }
+            }
         }
 
-        // 1. Explicit total and amount on the same OCR line.
+        fun startsWithTotalLabel(line: String): Boolean {
+            val normalized = normalize(line).trim()
+            return normalized.matches(Regex("^(grand total|total due|amount due|balance due|total|importe total|importe final|tutar|genel toplam)\\b.*"))
+        }
+
+        // 1. Highest-confidence case: the OCR line itself starts with the total label.
+        // This prevents a product-description line such as `... TOTAL PAN ... 5,00`
+        // from winning merely because it contains the word TOTAL.
         lines.forEach { line ->
-            if (!keywordMatch(line, totalKeywords) || keywordMatch(line, negativeKeywords)) return@forEach
+            if (!startsWithTotalLabel(line) || hasStandaloneKeyword(line, negativeKeywords)) return@forEach
             amountsOnLine(line).lastOrNull()?.let { return it }
         }
 
-        // 2. OCR often separates `TOTAL ........` and `23,02` into adjacent lines.
+        // 2. Next-highest confidence: TOTAL is a standalone field label and the amount
+        // is on the following one or two OCR lines.
         lines.forEachIndexed { index, line ->
-            if (!keywordMatch(line, totalKeywords) || keywordMatch(line, negativeKeywords)) return@forEachIndexed
+            if (!hasStandaloneKeyword(line, totalKeywords) || hasStandaloneKeyword(line, negativeKeywords)) return@forEachIndexed
+            val normalized = normalize(line)
+            val looksLikeDescription = normalizedWords(line).size >= 4 && !startsWithTotalLabel(line)
+            if (looksLikeDescription) return@forEachIndexed
             for (nextIndex in (index + 1)..minOf(index + 2, lines.lastIndex)) {
                 amountsOnLine(lines[nextIndex]).lastOrNull()?.let { return it }
             }
         }
 
-        // 3. A payment line is a conservative receipt-specific fallback.
-        lines.forEach { line ->
-            if (!keywordMatch(line, paymentKeywords)) return@forEach
-            amountsOnLine(line).lastOrNull()?.let { return it }
-        }
-
-        // If the original OCR missed the total row, do not accept a random product
-        // price yet. Re-render the PDF at a larger width and run ML Kit OCR locally.
+        // 3. Visual retry before accepting any ambiguous amount. This is particularly
+        // important for photographed receipts where OCR reading order can be wrong.
         if (allowVisualRetry) {
             currentDocumentFile?.let { pdf ->
                 val visualOcr = runCatching { highResolutionOcr(pdf) }.getOrNull().orEmpty()
@@ -221,9 +231,16 @@ object AiPdfAssistant {
             }
         }
 
-        // Last resort: largest two-decimal amount in the OCR. This is intentionally
-        // after the visual retry, because using it too early caused `5,00` to win.
-        return lines.flatMap { amountsOnLine(it) }.maxByOrNull { parseReceiptNumber(it.amount) ?: Double.MIN_VALUE }
+        // 4. Conservative payment-line fallback.
+        lines.forEach { line ->
+            if (!hasStandaloneKeyword(line, paymentKeywords)) return@forEach
+            amountsOnLine(line).lastOrNull()?.let { return it }
+        }
+
+        // 5. Last resort only: largest two-decimal amount. This must be the final
+        // fallback so a product price such as `5,00` cannot mask a visible TOTAL row.
+        return lines.flatMap { amountsOnLine(it) }
+            .maxByOrNull { parseReceiptNumber(it.amount) ?: Double.MIN_VALUE }
     }
 
     private fun highResolutionOcr(pdf: File): String {
