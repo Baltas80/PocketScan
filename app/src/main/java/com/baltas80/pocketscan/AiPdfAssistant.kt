@@ -39,8 +39,6 @@ object AiPdfAssistant {
 
         // Monetary totals must be deterministic. Cloud AI can otherwise answer with a
         // plausible product price even when the OCR contains an explicit TOTAL row.
-        // Resolve these questions locally from OCR, with a high-resolution visual OCR
-        // retry when the first OCR pass missed the total row entirely.
         val normalizedQuestion = normalize(question)
         if (normalizedQuestion.contains("total") || normalizedQuestion.contains("importe")) {
             return@withContext flow { emit(localAnswer(question, ocrText)) }
@@ -78,8 +76,12 @@ object AiPdfAssistant {
                     }
                 }
                 if (!emitted) emit(localAnswer(question, ocrText))
-            } catch (_: Throwable) {
-                emit(localAnswer(question, ocrText))
+            } catch (error: Throwable) {
+                // Do not hide the real Firebase AI Logic/App Check/model error during
+                // development. The previous generic message made it impossible to
+                // distinguish an unregistered App Check debug token from a backend or
+                // model configuration problem.
+                emit(cloudErrorAnswer(error))
             }
         }
     }
@@ -107,6 +109,16 @@ object AiPdfAssistant {
         val response = model.generateContent(prompt)
         response.text?.trim().takeUnless { it.isNullOrBlank() }
             ?: throw IllegalStateException("La IA no devolvió texto corregido")
+    }
+
+    private fun cloudErrorAnswer(error: Throwable): String {
+        val root = generateSequence(error) { it.cause }.lastOrNull() ?: error
+        val raw = root.message?.trim().orEmpty()
+        val detail = raw.take(500).ifBlank { root::class.java.simpleName }
+        return when (languageCode()) {
+            "es" -> "La IA en la nube no ha podido responder.\n\nDiagnóstico: $detail"
+            else -> "Cloud AI could not answer.\n\nDiagnostic: $detail"
+        }
     }
 
     private fun localAnswer(question: String, ocrText: String): String {
