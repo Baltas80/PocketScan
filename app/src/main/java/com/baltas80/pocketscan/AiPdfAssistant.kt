@@ -101,7 +101,7 @@ object AiPdfAssistant {
             ?: throw IllegalStateException("La IA no devolvió texto corregido")
     }
 
-    private fun createModel(): GenerativeModel = Firebase.ai(
+    private suspend fun createModel(): GenerativeModel = Firebase.ai(
         backend = GenerativeBackend.googleAI(),
         useLimitedUseAppCheckTokens = true
     ).generativeModel(AiModelConfig.modelName())
