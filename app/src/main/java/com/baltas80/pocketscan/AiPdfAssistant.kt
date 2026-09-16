@@ -35,24 +35,17 @@ object AiPdfAssistant {
             try {
                 val normalizedQuestion = normalize(question)
 
-                // First use geometry-aware OCR for accounting values. It keeps the
-                // physical relationship between TOTAL and its value and therefore
-                // cannot pair an amount from a distant product row with the label.
+                // Accounting values are resolved by geometry-aware OCR first. This keeps
+                // the physical relationship between TOTAL and its value and prevents a
+                // product amount such as 5,00 from being paired with a distant TOTAL.
                 if (normalizedQuestion.contains("total") || normalizedQuestion.contains("importe")) {
                     SpatialReceiptTotalExtractor.extract(file)?.let { verified ->
                         emit(exactTotalAnswer(verified))
                         return@flow
                     }
-                    ReceiptTotalExtractor.extract(ocrText)?.let { verified ->
-                        emit(exactTotalAnswer(verified))
-                        return@flow
-                    }
-                    runCatching { ReceiptTotalExtractor.extract(highResolutionOcr(file)) }
-                        .getOrNull()
-                        ?.let { verified ->
-                            emit(exactTotalAnswer(verified))
-                            return@flow
-                        }
+                    // Do not fall back to text-only total heuristics. When geometry cannot
+                    // verify the amount, Gemini receives the real PDF and can inspect its
+                    // visual layout. A wrong total is worse than an explicit cloud error.
                 }
 
                 val model = createModel()
@@ -61,9 +54,10 @@ object AiPdfAssistant {
                     text("""
                         You are PocketScan's document assistant. Answer ONLY from this PDF and the auxiliary OCR below.
                         Never invent facts or use outside knowledge.
-                        If the user asks for a total or amount, use the line explicitly labelled TOTAL or TOTAL A PAGAR.
+                        Treat the OCR reading order as unreliable when it conflicts with the visual PDF layout.
+                        For totals and amounts, identify the actual financial summary row visually.
                         Do not use an item price, subtotal, tax, cash received or change as the document total.
-                        Respect table columns and document layout. Treat OCR reading order as unreliable when it conflicts with the visual PDF.
+                        The value must belong to the TOTAL/TOTAL A PAGAR field in the document, not merely be nearby in OCR text.
                         If the PDF does not contain enough information, say so clearly.
                         Answer in ${languageName()} and be concise.
 
@@ -114,16 +108,6 @@ object AiPdfAssistant {
         backend = GenerativeBackend.googleAI(),
         useLimitedUseAppCheckTokens = true
     ).generativeModel(AiModelConfig.modelName())
-
-    private fun exactTotalAnswer(total: ReceiptTotalExtractor.Total): String {
-        val formatted = "%.2f".format(Locale.US, total.amount).replace('.', ',')
-        val amount = total.currency?.let { "$formatted $it" } ?: formatted
-        return if (languageCode() == "es") {
-            "Importe total verificado: $amount."
-        } else {
-            "Verified document total: $amount."
-        }
-    }
 
     private fun exactTotalAnswer(total: SpatialReceiptTotalExtractor.Total): String {
         val formatted = "%.2f".format(Locale.US, total.amount).replace('.', ',')
