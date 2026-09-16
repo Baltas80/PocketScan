@@ -1,15 +1,26 @@
 package com.baltas80.pocketscan
 
+import android.graphics.Bitmap
+import android.graphics.pdf.PdfRenderer
+import android.os.ParcelFileDescriptor
+import com.google.android.gms.tasks.Tasks
 import com.google.firebase.Firebase
 import com.google.firebase.ai.GenerativeModel
 import com.google.firebase.ai.ai
 import com.google.firebase.ai.type.GenerativeBackend
+import com.google.mlkit.vision.common.InputImage
+import com.google.mlkit.vision.text.TextRecognition
+import com.google.mlkit.vision.text.latin.TextRecognizerOptions
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import java.io.File
+import java.text.Normalizer
 import java.util.Locale
 
 object AiLibraryAssistant {
+    private const val VISUAL_OCR_WIDTH = 1800
+    private const val VISUAL_OCR_MAX_PAGES = 3
+
     suspend fun ask(filesDir: File, question: String): Result<String> = withContext(Dispatchers.IO) {
         runCatching {
             val scans = File(filesDir, "scans")
@@ -20,17 +31,15 @@ object AiLibraryAssistant {
                 .toList()
             if (documents.isEmpty()) return@runCatching noDocumentsMessage()
 
-            // Totals are deterministic financial data. Resolve them directly from OCR before
-            // semantic filtering or Gemini so an item price can never replace the receipt total.
             if (asksTotal(question)) {
                 val ocrTotals = documents.mapNotNull { file ->
-                    findReceiptTotalFromOcr(file)?.let { total -> file to total }
+                    findReceiptTotalFromOcr(file)?.let { file to it }
                 }
                 if (ocrTotals.size == 1) {
                     return@runCatching exactOcrTotalAnswer(ocrTotals.single().second)
                 }
                 if (ocrTotals.size > 1) {
-                    val currencies = ocrTotals.mapNotNull { it.second.second }.distinct()
+                    val currencies = ocrTotals.map { it.second.second }.distinct()
                     if (currencies.size == 1) {
                         val sum = ocrTotals.sumOf { it.second.first }
                         return@runCatching exactOcrAggregateAnswer(sum, currencies.single(), ocrTotals.size)
@@ -39,7 +48,9 @@ object AiLibraryAssistant {
             }
 
             val queryResult = AiLibraryQueryEngine.query(question, documents)
-            if (queryResult.matches.isEmpty()) return@runCatching insufficientMessage(languageCode())
+            if (queryResult.matches.isEmpty()) {
+                return@runCatching insufficientMessage(languageCode())
+            }
 
             val context = AiLibraryQueryEngine.buildContext(queryResult).take(30000)
             tryCloud(question, context).getOrElse {
@@ -53,13 +64,14 @@ object AiLibraryAssistant {
             backend = GenerativeBackend.googleAI(),
             useLimitedUseAppCheckTokens = true
         ).generativeModel(AiModelConfig.modelName())
+
         val language = languageName()
         val prompt = """
             You are PocketScan's document library assistant.
             Answer ONLY from the structured library results supplied below. Never invent facts.
             Respect the filters already applied by the local query engine.
             If an aggregate total is supplied, use it exactly and do not recalculate it from unrelated values.
-            VERIFIED_TOTAL is authoritative when present: it was extracted from a line explicitly labelled as the document total in the local OCR.
+            VERIFIED_TOTAL is authoritative when present: it was extracted from a line explicitly labelled as the document total.
             When the user asks for a total, never substitute an item price, subtotal, tax amount, or another monetary value.
             You may summarize, compare, count, and identify dates, suppliers, clients, categories and amounts.
             Respond in the user's language: $language. Keep the answer concise and useful.
@@ -70,19 +82,20 @@ object AiLibraryAssistant {
             STRUCTURED LIBRARY RESULTS:
             $context
         """.trimIndent()
+
         val answer = model.generateContent(prompt).text?.trim()?.takeIf { it.isNotBlank() }
             ?: error("AI returned no answer")
         "Gemini conectado\n\n$answer"
     }
 
-    private fun localAnswer(
-        question: String,
-        result: AiLibraryQueryEngine.Result
-    ): String {
+    private fun localAnswer(question: String, result: AiLibraryQueryEngine.Result): String {
         val language = languageCode()
         val normalizedQuestion = normalize(question)
-        val asksTotal = asksTotal(question)
-        val asksCount = normalizedQuestion.contains("cuantas") || normalizedQuestion.contains("cuantos") || normalizedQuestion.contains("cantidad") || normalizedQuestion.contains("count") || normalizedQuestion.contains("how many")
+        val asksCount = normalizedQuestion.contains("cuantas") ||
+            normalizedQuestion.contains("cuantos") ||
+            normalizedQuestion.contains("cantidad") ||
+            normalizedQuestion.contains("count") ||
+            normalizedQuestion.contains("how many")
 
         if (asksCount) {
             val answer = when (language) {
@@ -97,16 +110,11 @@ object AiLibraryAssistant {
             return localPrefix(language) + answer
         }
 
-        if (asksTotal) {
+        if (asksTotal(question)) {
             if (result.aggregateTotal != null && result.aggregateCurrency != null) {
                 val formatted = "%.2f".format(Locale.US, result.aggregateTotal)
                 val answer = when (language) {
                     "es" -> "Total de los ${result.matches.size} documentos encontrados: $formatted ${result.aggregateCurrency}."
-                    "fr" -> "Total des ${result.matches.size} documents trouvés : $formatted ${result.aggregateCurrency}."
-                    "de" -> "Gesamtsumme der ${result.matches.size} gefundenen Dokumente: $formatted ${result.aggregateCurrency}."
-                    "it" -> "Totale dei ${result.matches.size} documenti trovati: $formatted ${result.aggregateCurrency}."
-                    "pt" -> "Total dos ${result.matches.size} documentos encontrados: $formatted ${result.aggregateCurrency}."
-                    "ca" -> "Total dels ${result.matches.size} documents trobats: $formatted ${result.aggregateCurrency}."
                     else -> "Total for the ${result.matches.size} matching documents: $formatted ${result.aggregateCurrency}."
                 }
                 return localPrefix(language) + answer
@@ -118,9 +126,10 @@ object AiLibraryAssistant {
                 if (total != null) {
                     val formatted = "%.2f".format(Locale.US, total)
                     val amount = match.currency?.takeIf { it.isNotBlank() }?.let { "$formatted $it" } ?: formatted
-                    val answer = when (language) {
-                        "es" -> "Importe total del documento: $amount."
-                        else -> "Document total: $amount."
+                    val answer = if (language == "es") {
+                        "Importe total del documento: $amount."
+                    } else {
+                        "Document total: $amount."
                     }
                     return localPrefix(language) + answer
                 }
@@ -136,6 +145,7 @@ object AiLibraryAssistant {
             "ca" -> "La IA al núvol no està disponible. Resultats locals:"
             else -> "Cloud AI is unavailable. Local results:"
         }
+
         val lines = result.matches.take(20).mapIndexed { index, match ->
             val analysis = match.analysis
             val title = analysis?.title?.takeIf { it.isNotBlank() } ?: match.file.nameWithoutExtension
@@ -150,114 +160,149 @@ object AiLibraryAssistant {
                 total?.let { append(" — Total: ").append(it) }
             }
         }.joinToString("\n")
+
         return "$heading\n\n$lines"
     }
 
     private fun asksTotal(question: String): Boolean {
         val normalized = normalize(question)
-        return normalized.contains("total") || normalized.contains("cuanto") || normalized.contains("importe") || normalized.contains("suma") || normalized.contains("sum")
+        return normalized.contains("total") ||
+            normalized.contains("cuanto") ||
+            normalized.contains("importe") ||
+            normalized.contains("suma") ||
+            normalized.contains("sum")
     }
 
-    /**
-     * Receipt-specific deterministic resolver. This follows the robust strategy used by
-     * a proven open-source receipt parser: rank explicit total labels, read the last amount
-     * on the line, tolerate OCR splitting the label and amount across adjacent lines, then
-     * use a conservative payment-line/largest-amount fallback.
-     */
-    private fun findReceiptTotalFromOcr(file: File): Pair<Double, String?>? {
+    private suspend fun findReceiptTotalFromOcr(file: File): Pair<Double, String?>? {
         val ocr = File(file.parentFile, "${file.nameWithoutExtension}.txt")
-        if (!ocr.isFile) return null
-        val text = runCatching { ocr.readText(Charsets.UTF_8) }.getOrNull() ?: return null
+        val text = if (ocr.isFile) runCatching { ocr.readText(Charsets.UTF_8) }.getOrDefault("") else ""
+        findExplicitReceiptTotal(text)?.let { return it }
+
+        // The document viewer already proved that a higher-resolution visual OCR pass
+        // can recover totals that the saved OCR sidecar misses. The library assistant
+        // now uses the same retry before accepting any ambiguous monetary value.
+        val visual = runCatching { highResolutionOcr(file) }.getOrDefault("")
+        if (visual.isNotBlank()) {
+            findExplicitReceiptTotal(visual)?.let { return it }
+        }
+
+        // Never guess a total from the largest product price. If no explicit total can
+        // be verified, return null so the UI reports that it could not verify the total.
+        return null
+    }
+
+    private fun findExplicitReceiptTotal(text: String): Pair<Double, String?>? {
         val lines = text.lineSequence().map { it.trim() }.filter { it.isNotEmpty() }.toList()
         if (lines.isEmpty()) return null
 
-        val totalKeywords = listOf(
-            "grand total", "total due", "amount due", "balance due",
-            "total", "toplam", "genel toplam", "tutar", "importe total", "importe final"
-        )
-        val negativeKeywords = listOf(
-            "subtotal", "sub total", "ara toplam", "tax", "kdv", "vat",
-            "change", "cash", "tip", "discount", "indirim"
-        )
-        val paymentKeywords = listOf("tarjeta", "pago", "efectivo", "card", "payment")
         val amount = Regex("(?<!\\d)(\\d{1,3}(?:[.,]\\d{3})*(?:[.,]\\d{2})|\\d+[.,]\\d{2})(?!\\d)")
+        val totalStart = Regex("(?i)^(grand total|total due|amount due|balance due|total|importe total|importe final|total general|total factura|tutar|genel toplam)\\b")
+        val standaloneTotal = Regex("(?i)^\\s*(grand total|total due|amount due|balance due|total|importe total|importe final|total general|total factura|tutar|genel toplam)\\s*[:.]?\\s*$")
+        val negative = Regex("(?i)\\b(subtotal|sub total|tax|kdv|vat|change|cash|tip|discount|indirim)\\b")
 
-        fun currencyFromLine(line: String): String? {
-            return when {
-                Regex("(?i)€|\\bEUR\\b").containsMatchIn(line) -> "EUR"
-                Regex("(?i)\\$|\\bUSD\\b").containsMatchIn(line) -> "USD"
-                Regex("(?i)£|\\bGBP\\b").containsMatchIn(line) -> "GBP"
-                else -> null
+        fun currency(line: String): String? = when {
+            Regex("(?i)€|\\bEUR\\b").containsMatchIn(line) -> "EUR"
+            Regex("(?i)\\$|\\bUSD\\b").containsMatchIn(line) -> "USD"
+            Regex("(?i)£|\\bGBP\\b").containsMatchIn(line) -> "GBP"
+            else -> null
+        }
+
+        fun parse(value: String): Double? {
+            val s = value.replace(" ", "")
+            return runCatching {
+                when {
+                    s.contains(',') && s.contains('.') ->
+                        if (s.lastIndexOf(',') > s.lastIndexOf('.')) s.replace(".", "").replace(',', '.') else s.replace(",", "")
+                    s.count { it == ',' } == 1 && s.substringAfter(',').length == 2 -> s.replace(',', '.')
+                    s.count { it == '.' } == 1 && s.substringAfter('.').length == 2 -> s
+                    else -> s
+                }.toDouble()
+            }.getOrNull()
+        }
+
+        fun amounts(line: String): List<Double> = amount.findAll(line).mapNotNull { parse(it.value) }.toList()
+        fun result(line: String, value: Double): Pair<Double, String?> = value to currency(line)
+
+        lines.forEach { line ->
+            if (negative.containsMatchIn(line)) return@forEach
+            if (totalStart.containsMatchIn(normalize(line))) {
+                amounts(line).lastOrNull()?.let { return result(line, it) }
             }
         }
 
-        fun amountsOnLine(line: String): List<Pair<Double, String?>> = amount.findAll(line).mapNotNull { match ->
-            parseReceiptNumber(match.value)?.let { it to currencyFromLine(line) }
-        }.toList()
-
-        fun keywordMatch(line: String, keywords: List<String>): Boolean {
-            val normalized = normalize(line)
-            return keywords.any { normalized.contains(normalize(it)) }
-        }
-
-        // 1. Strongest signal: explicit total keyword and an amount on the same line.
-        lines.forEach { line ->
-            if (!keywordMatch(line, totalKeywords) || keywordMatch(line, negativeKeywords)) return@forEach
-            val candidates = amountsOnLine(line)
-            if (candidates.isNotEmpty()) return candidates.last()
-        }
-
-        // 2. OCR frequently puts `TOTAL ........` and `23,02` on separate lines.
         lines.forEachIndexed { index, line ->
-            if (!keywordMatch(line, totalKeywords) || keywordMatch(line, negativeKeywords)) return@forEachIndexed
-            for (nextIndex in (index + 1)..minOf(index + 2, lines.lastIndex)) {
-                val candidates = amountsOnLine(lines[nextIndex])
-                if (candidates.isNotEmpty()) return candidates.last()
+            if (!standaloneTotal.matches(line) || negative.containsMatchIn(line)) return@forEachIndexed
+            for (offset in 1..2) {
+                val next = lines.getOrNull(index + offset) ?: break
+                amounts(next).lastOrNull()?.let { return result(next, it) }
             }
         }
 
-        // 3. Payment line is a conservative receipt-specific fallback.
-        lines.forEach { line ->
-            if (!keywordMatch(line, paymentKeywords)) return@forEach
-            val candidates = amountsOnLine(line)
-            if (candidates.isNotEmpty()) return candidates.last()
+        // Some printers put TOTAL on the same line as dotted leaders. If the label is
+        // present but not at column zero, accept it only when the line is otherwise short.
+        lines.forEachIndexed { index, line ->
+            val n = normalize(line)
+            if (!n.contains("total") || negative.containsMatchIn(line) || n.length > 80) return@forEachIndexed
+            amounts(line).lastOrNull()?.let { return result(line, it) }
+            for (offset in 1..2) {
+                val next = lines.getOrNull(index + offset) ?: break
+                amounts(next).lastOrNull()?.let { return result(next, it) }
+            }
         }
 
-        // 4. Final fallback: the largest two-decimal monetary amount in the OCR.
-        // This is intentionally last so item prices do not outrank an explicit total.
-        val allAmounts = lines.flatMap { amountsOnLine(it) }
-        return allAmounts.maxByOrNull { it.first }
+        return null
     }
 
-    private fun parseReceiptNumber(value: String): Double? {
-        val s = value.replace(" ", "")
-        return runCatching {
-            val normalized = when {
-                s.contains(',') && s.contains('.') -> if (s.lastIndexOf(',') > s.lastIndexOf('.')) s.replace(".", "").replace(',', '.') else s.replace(",", "")
-                s.count { it == ',' } == 1 && s.substringAfter(',').length == 2 -> s.replace(',', '.')
-                s.count { it == '.' } == 1 && s.substringAfter('.').length == 2 -> s
-                s.count { it == ',' } > 1 -> s.replace(",", "")
-                s.count { it == '.' } > 1 -> s.replace(".", "")
-                else -> s
+    private fun highResolutionOcr(pdf: File): String {
+        if (!pdf.isFile) return ""
+        val recognizer = TextRecognition.getClient(TextRecognizerOptions.DEFAULT_OPTIONS)
+        return try {
+            val output = StringBuilder()
+            ParcelFileDescriptor.open(pdf, ParcelFileDescriptor.MODE_READ_ONLY).use { descriptor ->
+                PdfRenderer(descriptor).use { renderer ->
+                    val pages = renderer.pageCount.coerceAtMost(VISUAL_OCR_MAX_PAGES)
+                    for (index in 0 until pages) {
+                        renderer.openPage(index).use { page ->
+                            val ratio = page.height.toFloat() / page.width.toFloat()
+                            val height = (VISUAL_OCR_WIDTH * ratio).toInt().coerceAtLeast(1)
+                            val bitmap = Bitmap.createBitmap(VISUAL_OCR_WIDTH, height, Bitmap.Config.ARGB_8888)
+                            try {
+                                page.render(bitmap, null, null, PdfRenderer.Page.RENDER_MODE_FOR_DISPLAY)
+                                val result = Tasks.await(recognizer.process(InputImage.fromBitmap(bitmap, 0)))
+                                if (result.text.isNotBlank()) {
+                                    if (output.isNotEmpty()) output.append("\n\n")
+                                    output.append(result.text)
+                                }
+                            } finally {
+                                bitmap.recycle()
+                            }
+                        }
+                    }
+                }
             }
-            normalized.toDouble()
-        }.getOrNull()
+            output.toString()
+        } finally {
+            recognizer.close()
+        }
     }
 
     private fun exactOcrTotalAnswer(total: Pair<Double, String?>): String {
         val formatted = "%.2f".format(Locale.US, total.first).replace('.', ',')
         val amount = total.second?.let { "$formatted $it" } ?: formatted
-        return when (languageCode()) {
-            "es" -> "Total verificado por OCR: $amount."
-            else -> "OCR-verified total: $amount."
+        return if (languageCode() == "es") {
+            "Total verificado por OCR: $amount."
+        } else {
+            "OCR-verified total: $amount."
         }
     }
 
-    private fun exactOcrAggregateAnswer(total: Double, currency: String, count: Int): String {
+    private fun exactOcrAggregateAnswer(total: Double, currency: String?, count: Int): String {
         val formatted = "%.2f".format(Locale.US, total).replace('.', ',')
-        return when (languageCode()) {
-            "es" -> "Total verificado por OCR de los $count documentos: $formatted $currency."
-            else -> "OCR-verified total of $count documents: $formatted $currency."
+        val amount = currency?.let { "$formatted $it" } ?: formatted
+        return if (languageCode() == "es") {
+            "Total verificado por OCR de los $count documentos: $amount."
+        } else {
+            "OCR-verified total of $count documents: $amount."
         }
     }
 
@@ -312,15 +357,8 @@ object AiLibraryAssistant {
         else -> "English"
     }
 
-    private fun normalize(value: String): String = java.text.Normalizer.normalize(
+    private fun normalize(value: String): String = Normalizer.normalize(
         value.lowercase(Locale.ROOT),
-        java.text.Normalizer.Form.NFD
-    ).replace("\\p{InCombiningDiacriticalMarks}+".toRegex(), "")
-
-    private fun normalizeCurrency(value: String): String = when (value.uppercase(Locale.ROOT)) {
-        "€", "EUR" -> "EUR"
-        "$", "USD" -> "USD"
-        "£", "GBP" -> "GBP"
-        else -> value
-    }
+        Normalizer.Form.NFD
+    ).replace("\\p{M}+".toRegex(), "")
 }
