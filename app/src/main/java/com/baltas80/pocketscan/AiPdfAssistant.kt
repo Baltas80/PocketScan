@@ -35,15 +35,24 @@ object AiPdfAssistant {
             try {
                 val normalizedQuestion = normalize(question)
 
-                // Accounting values are not guessed. First verify an explicit TOTAL in
-                // the saved OCR and then retry with a higher-resolution visual OCR pass.
+                // First use geometry-aware OCR for accounting values. It keeps the
+                // physical relationship between TOTAL and its value and therefore
+                // cannot pair an amount from a distant product row with the label.
                 if (normalizedQuestion.contains("total") || normalizedQuestion.contains("importe")) {
-                    val verified = ReceiptTotalExtractor.extract(ocrText)
-                        ?: runCatching { ReceiptTotalExtractor.extract(highResolutionOcr(file)) }.getOrNull()
-                    if (verified != null) {
+                    SpatialReceiptTotalExtractor.extract(file)?.let { verified ->
                         emit(exactTotalAnswer(verified))
                         return@flow
                     }
+                    ReceiptTotalExtractor.extract(ocrText)?.let { verified ->
+                        emit(exactTotalAnswer(verified))
+                        return@flow
+                    }
+                    runCatching { ReceiptTotalExtractor.extract(highResolutionOcr(file)) }
+                        .getOrNull()
+                        ?.let { verified ->
+                            emit(exactTotalAnswer(verified))
+                            return@flow
+                        }
                 }
 
                 val model = createModel()
@@ -54,7 +63,7 @@ object AiPdfAssistant {
                         Never invent facts or use outside knowledge.
                         If the user asks for a total or amount, use the line explicitly labelled TOTAL or TOTAL A PAGAR.
                         Do not use an item price, subtotal, tax, cash received or change as the document total.
-                        Respect table columns and document layout.
+                        Respect table columns and document layout. Treat OCR reading order as unreliable when it conflicts with the visual PDF.
                         If the PDF does not contain enough information, say so clearly.
                         Answer in ${languageName()} and be concise.
 
@@ -107,6 +116,16 @@ object AiPdfAssistant {
     ).generativeModel(AiModelConfig.modelName())
 
     private fun exactTotalAnswer(total: ReceiptTotalExtractor.Total): String {
+        val formatted = "%.2f".format(Locale.US, total.amount).replace('.', ',')
+        val amount = total.currency?.let { "$formatted $it" } ?: formatted
+        return if (languageCode() == "es") {
+            "Importe total verificado: $amount."
+        } else {
+            "Verified document total: $amount."
+        }
+    }
+
+    private fun exactTotalAnswer(total: SpatialReceiptTotalExtractor.Total): String {
         val formatted = "%.2f".format(Locale.US, total.amount).replace('.', ',')
         val amount = total.currency?.let { "$formatted $it" } ?: formatted
         return if (languageCode() == "es") {
