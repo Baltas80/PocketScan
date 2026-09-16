@@ -59,7 +59,7 @@ dependencies {
     implementation("com.google.guava:guava:33.2.1-android")
 
     // Gemini through Firebase AI Logic.
-    implementation(platform("com.google.firebase:firebase-bom:34.18.0"))
+    implementation(platform("com.google.firebase:firebase-bom:34.19.0"))
     implementation("com.google.firebase:firebase-ai")
     implementation("com.google.firebase:firebase-config")
 
