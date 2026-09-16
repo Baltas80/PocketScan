@@ -12,15 +12,13 @@ import com.google.mlkit.vision.text.latin.TextRecognizerOptions
 import java.io.File
 import java.util.Locale
 
-/**
- * Extracts receipt totals using OCR geometry instead of OCR reading order.
- * This prevents words and amounts from different physical rows being paired.
- */
+/** Extracts receipt totals from OCR geometry, not OCR reading order. */
 object SpatialReceiptTotalExtractor {
     data class Total(val amount: Double, val currency: String?, val confidence: Double)
 
     private const val RENDER_WIDTH = 2200
     private const val MAX_PAGES = 3
+    private val amountRegex = Regex("(?<!\\d)(\\d{1,3}(?:[.,]\\d{3})*(?:[.,]\\d{2})|\\d+[.,]\\d{2})(?!\\d)")
 
     fun extract(pdf: File): Total? {
         if (!pdf.isFile) return null
@@ -29,22 +27,16 @@ object SpatialReceiptTotalExtractor {
             ParcelFileDescriptor.open(pdf, ParcelFileDescriptor.MODE_READ_ONLY).use { descriptor ->
                 PdfRenderer(descriptor).use { renderer ->
                     var best: Total? = null
-                    val pages = renderer.pageCount.coerceAtMost(MAX_PAGES)
-                    for (pageIndex in 0 until pages) {
-                        renderer.openPage(pageIndex).use { page ->
+                    for (index in 0 until renderer.pageCount.coerceAtMost(MAX_PAGES)) {
+                        renderer.openPage(index).use { page ->
                             val ratio = page.height.toFloat() / page.width.toFloat()
                             val height = (RENDER_WIDTH * ratio).toInt().coerceAtLeast(1)
                             val bitmap = Bitmap.createBitmap(RENDER_WIDTH, height, Bitmap.Config.ARGB_8888)
                             try {
                                 page.render(bitmap, null, null, PdfRenderer.Page.RENDER_MODE_FOR_DISPLAY)
-                                val result = Tasks.await(
-                                    recognizer.process(InputImage.fromBitmap(bitmap, 0))
-                                )
-                                findBestTotal(result)?.let { candidate ->
-                                    if (best == null || candidate.confidence > best!!.confidence) {
-                                        best = candidate
-                                    }
-                                }
+                                val result = Tasks.await(recognizer.process(InputImage.fromBitmap(bitmap, 0)))
+                                val candidate = findBestTotal(result)
+                                if (candidate != null && (best == null || candidate.confidence > best!!.confidence)) best = candidate
                             } finally {
                                 bitmap.recycle()
                             }
@@ -58,133 +50,73 @@ object SpatialReceiptTotalExtractor {
         }
     }
 
-    private data class Candidate(
-        val text: String,
-        val box: Rect,
-        val amount: Double,
-        val currency: String?,
-        val explicitLabel: Boolean,
-        val nearbyPayment: Boolean
-    )
+    private data class AmountCandidate(val line: Text.Line, val box: Rect, val amount: Double, val currency: String?)
 
     private fun findBestTotal(result: Text): Total? {
-        val lines = result.textBlocks.flatMap { it.lines }
-            .filter { it.boundingBox != null && it.text.isNotBlank() }
-
-        val amounts = lines.flatMap { line ->
-            amountMatches(line).map { match ->
-                Candidate(
-                    text = line.text,
-                    box = line.boundingBox!!,
-                    amount = match.first,
-                    currency = match.second ?: currencyFromText(line.text),
-                    explicitLabel = containsStandaloneTotal(line.text),
-                    nearbyPayment = containsPaymentLabel(line.text)
-                )
+        val lines = result.textBlocks.flatMap { it.lines }.filter { it.boundingBox != null && it.text.isNotBlank() }
+        val candidates = lines.flatMap { line ->
+            amountRegex.findAll(line.text).mapNotNull { match ->
+                parseNumber(match.value)?.let { value -> AmountCandidate(line, line.boundingBox!!, value, currency(line.text)) }
             }
-        }
-        if (amounts.isEmpty()) return null
+        }.toList()
+        if (candidates.isEmpty()) return null
 
-        // Highest confidence: TOTAL label and amount on the same physical OCR line.
-        amounts.filter { it.explicitLabel }
-            .maxByOrNull { candidateScore(it, result.textBlocks.flatMap { block -> block.lines }) }
+        // 1) Exact physical line: a line beginning with TOTAL and containing an amount.
+        candidates.filter { startsWithTotal(it.line.text) && !negative(it.line.text) }
+            .maxByOrNull { scoreExact(it) }
             ?.let { return Total(it.amount, it.currency, 1.0) }
 
-        // Second pass: pair a standalone TOTAL label with the closest amount vertically
-        // and require the amount to be in the same right-hand summary column. The
-        // vertical relationship is deliberately tight: an amount five rows below is
-        // never paired with a TOTAL label from above.
-        val totalLabels = lines.filter { isStandaloneTotalLabel(it.text) }
-        totalLabels.forEach { label ->
-            val labelBox = label.boundingBox ?: return@forEach
-            val candidate = amounts
-                .filter { !it.explicitLabel && !containsNegativePayment(it.text) }
-                .filter { horizontalCompatibility(labelBox, it.box) }
-                .minByOrNull { verticalDistance(labelBox, it.box) }
-            if (candidate != null) {
-                val distance = verticalDistance(labelBox, candidate.box)
-                if (distance <= labelBox.height * 2.2f) {
-                    return Total(candidate.amount, candidate.currency, 0.95)
-                }
-            }
+        // 2) Same row / same vertical band. TOTAL and amount may be separate OCR words/lines,
+        // but they must be physically adjacent; a value five rows below is rejected.
+        val labels = lines.filter { isStandaloneTotal(it.text) }
+        for (label in labels) {
+            val labelBox = label.boundingBox ?: continue
+            val nearby = candidates
+                .filter { !negative(it.line.text) }
+                .filter { kotlin.math.abs(it.box.centerY() - labelBox.centerY()) <= labelBox.height() * 1.75f }
+                .filter { it.box.centerX() >= labelBox.centerX() - labelBox.width() * 0.20f }
+                .minByOrNull { kotlin.math.abs(it.box.centerY() - labelBox.centerY()) }
+            if (nearby != null) return Total(nearby.amount, nearby.currency, 0.97)
         }
 
-        // Payment arithmetic can verify a receipt total even when OCR misses the label.
-        // Find a cash/change pair and the amount immediately above that summary block.
-        val paymentLines = lines.filter { containsPaymentLabel(it.text) }
-        for (payment in paymentLines) {
-            val paymentBox = payment.boundingBox ?: continue
-            val cash = amountMatches(payment.text).firstOrNull()?.first
-            if (cash != null) {
-                val change = lines.asSequence()
-                    .filter { it.boundingBox != null && it.boundingBox!!.top >= paymentBox.top }
-                    .flatMap { amountMatches(it.text).map { pair -> pair.first } }
-                    .firstOrNull { it > 0.0 }
-                if (change != null && cash >= change) {
-                    val derived = roundMoney(cash - change)
-                    val candidate = amounts.filter { roundMoney(it.amount) == derived }
-                        .minByOrNull { verticalDistance(it.box, paymentBox) }
-                    if (candidate != null) return Total(candidate.amount, candidate.currency, 0.9)
-                }
+        // 3) If TOTAL is OCR-missed, use document layout: find a payment summary row and
+        // a monetary value directly above it in the same right-hand amount column.
+        val paymentRows = lines.filter { containsPayment(it.text) }
+        for (payment in paymentRows) {
+            val pb = payment.boundingBox ?: continue
+            val previous = candidates
+                .filter { !negative(it.line.text) && it.box.bottom <= pb.top }
+                .minByOrNull { pb.top - it.box.bottom }
+            if (previous != null && pb.top - previous.box.bottom <= previous.box.height() * 3f) {
+                return Total(previous.amount, previous.currency, 0.86)
             }
         }
-
         return null
     }
 
-    private fun candidateScore(candidate: Candidate, lines: List<Text.Line>): Double {
+    private fun scoreExact(candidate: AmountCandidate): Double {
         var score = 100.0
-        val box = candidate.box
-        val nearby = lines.filter { it.boundingBox != null && kotlin.math.abs(it.boundingBox!!.centerY() - box.centerY()) <= box.height * 1.5f }
-        if (nearby.any { isStandaloneTotalLabel(it.text) }) score += 20.0
-        if (candidate.nearbyPayment) score -= 5.0
+        if (containsPayment(candidate.line.text)) score -= 10.0
         return score
     }
 
-    private fun horizontalCompatibility(label: Rect, amount: Rect): Boolean {
-        val rightColumn = amount.centerX() >= label.centerX() - label.width * 0.25f
-        val verticalBand = kotlin.math.abs(label.centerY() - amount.centerY()) <= label.height * 2.2f
-        return rightColumn && verticalBand
-    }
+    private fun startsWithTotal(text: String): Boolean = normalize(text)
+        .matches(Regex("^(grand total|total due|amount due|balance due|total|importe total|importe final|total general|total factura|tutar|genel toplam)\\b.*"))
 
-    private fun verticalDistance(a: Rect, b: Rect): Float = kotlin.math.abs(a.centerY() - b.centerY()).toFloat()
+    private fun isStandaloneTotal(text: String): Boolean = normalize(text)
+        .matches(Regex("^(grand total|total due|amount due|balance due|total|importe total|importe final|total general|total factura|tutar|genel toplam)\\s*[:.]?$"))
 
-    private fun isStandaloneTotalLabel(text: String): Boolean =
-        normalize(text).matches(Regex("^(grand total|total due|amount due|balance due|total|importe total|importe final|total general|total factura|tutar|genel toplam)\\s*[:.]?$"))
+    private fun negative(text: String): Boolean = Regex("\\b(subtotal|sub total|tax|kdv|vat|change|cash|tip|discount|indirim|descuento|cambio)\\b")
+        .containsMatchIn(normalize(text))
 
-    private fun containsStandaloneTotal(text: String): Boolean {
-        val normalized = normalize(text)
-        if (isStandaloneTotalLabel(text)) return true
-        return normalized.matches(Regex("^(grand total|total due|amount due|balance due|total|importe total|importe final|total general|total factura|tutar|genel toplam)\\b.*"))
-    }
-
-    private fun containsPaymentLabel(text: String): Boolean {
-        val normalized = normalize(text)
-        return Regex("\\b(efectivo|cash|payment|pago|tarjeta|card)\\b").containsMatchIn(normalized)
-    }
-
-    private fun containsNegativePayment(text: String): Boolean {
-        val normalized = normalize(text)
-        return Regex("\\b(cambio|change|discount|descuento|subtotal|iva|vat|tax|kdv)\\b").containsMatchIn(normalized)
-    }
-
-    private fun amountMatches(line: Text.Line): List<Pair<Double, String?>> = amountRegex.findAll(line.text)
-        .mapNotNull { parseNumber(it.value)?.let { value -> value to currencyFromText(line.text) } }
-        .toList()
-
-    private fun currencyFromText(text: String): String? = when {
-        Regex("(?i)€|\\bEUR\\b").containsMatchIn(text) -> "EUR"
-        Regex("(?i)\\$|\\bUSD\\b").containsMatchIn(text) -> "USD"
-        Regex("(?i)£|\\bGBP\\b").containsMatchIn(text) -> "GBP"
-        else -> null
-    }
+    private fun containsPayment(text: String): Boolean = Regex("\\b(efectivo|cash|payment|pago|tarjeta|card)\\b")
+        .containsMatchIn(normalize(text))
 
     private fun parseNumber(raw: String): Double? {
         val s = raw.replace(" ", "")
         return runCatching {
             when {
-                s.contains(',') && s.contains('.') ->
-                    if (s.lastIndexOf(',') > s.lastIndexOf('.')) s.replace(".", "").replace(',', '.') else s.replace(",", "")
+                s.contains(',') && s.contains('.') -> if (s.lastIndexOf(',') > s.lastIndexOf('.')) s.replace(".", "").replace(',', '.') else s.replace(",", "")
                 s.count { it == ',' } == 1 && s.substringAfter(',').length == 2 -> s.replace(',', '.')
                 s.count { it == '.' } == 1 && s.substringAfter('.').length == 2 -> s
                 else -> s
@@ -192,11 +124,13 @@ object SpatialReceiptTotalExtractor {
         }.getOrNull()
     }
 
-    private val amountRegex = Regex("(?<!\\d)(\\d{1,3}(?:[.,]\\d{3})*(?:[.,]\\d{2})|\\d+[.,]\\d{2})(?!\\d)")
+    private fun currency(text: String): String? = when {
+        Regex("(?i)€|\\bEUR\\b").containsMatchIn(text) -> "EUR"
+        Regex("(?i)\\$|\\bUSD\\b").containsMatchIn(text) -> "USD"
+        Regex("(?i)£|\\bGBP\\b").containsMatchIn(text) -> "GBP"
+        else -> null
+    }
 
-    private fun roundMoney(value: Double): Double = "%.2f".format(Locale.US, value).toDouble()
-
-    private fun normalize(value: String): String = value.lowercase(Locale.ROOT)
-        .replace('á', 'a').replace('é', 'e').replace('í', 'i').replace('ó', 'o').replace('ú', 'u')
-        .replace('ü', 'u')
+    private fun normalize(text: String): String = text.lowercase(Locale.ROOT)
+        .replace('á', 'a').replace('é', 'e').replace('í', 'i').replace('ó', 'o').replace('ú', 'u').replace('ü', 'u')
 }
