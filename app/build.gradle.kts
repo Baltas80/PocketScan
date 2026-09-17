@@ -39,7 +39,7 @@ dependencies {
     implementation("androidx.appcompat:appcompat:1.7.0")
     implementation("androidx.activity:activity-ktx:1.10.0")
     implementation("androidx.lifecycle:lifecycle-runtime-ktx:2.8.7")
-    implementation("androidx.recyclerview:recyclerview:1.3.2")
+    implementation("androidx.recyclerview:recyclerview:1.4.0")
     implementation("androidx.biometric:biometric:1.1.0")
     implementation("com.google.android.material:material:1.12.0")
     implementation("androidx.work:work-runtime-ktx:2.11.2")
