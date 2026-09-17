@@ -45,7 +45,7 @@ class AiDocumentAnalyzerTest {
                 Concepto: Servicios de mantenimiento
                 Periodo: septiembre 2026
             """.trimIndent()
-            val analysis = invokeLocalAnalysis(pdf, text)
+            val analysis = invokeLocalAnalysis(pdf, text, SpatialReceiptTotalExtractor.Total(1493.75, "EUR", 0.99))
             assertEquals(DocumentOrganizer.FACTURAS, analysis.category)
             assertEquals("ACME Servicios SL", analysis.title)
             assertEquals("1.493,75", analysis.fields["total"])
@@ -87,7 +87,7 @@ class AiDocumentAnalyzerTest {
                 VAT: 20%
                 Total amount: 300.00 USD
             """.trimIndent()
-            val analysis = invokeLocalAnalysis(pdf, text)
+            val analysis = invokeLocalAnalysis(pdf, text, SpatialReceiptTotalExtractor.Total(300.00, "USD", 0.99))
             assertEquals(DocumentOrganizer.FACTURAS, analysis.category)
             assertEquals("250.00", analysis.fields["subtotal"])
             assertEquals("300.00", analysis.fields["total"])
@@ -116,7 +116,7 @@ class AiDocumentAnalyzerTest {
                 IVA: 10 %
                 Total: $ 138.05
             """.trimIndent()
-            val analysis = invokeLocalAnalysis(pdf, text)
+            val analysis = invokeLocalAnalysis(pdf, text, SpatialReceiptTotalExtractor.Total(138.05, "USD", 0.99))
             assertEquals("125.50", analysis.fields["subtotal"])
             assertEquals("138.05", analysis.fields["total"])
             assertEquals("USD", analysis.fields["moneda"])
@@ -129,9 +129,19 @@ class AiDocumentAnalyzerTest {
     }
 
     @Suppress("UNCHECKED_CAST")
-    private fun invokeLocalAnalysis(file: File, text: String): AiDocumentAnalyzer.Analysis {
-        val method = AiDocumentAnalyzer::class.java.getDeclaredMethod("localAnalysis", File::class.java, String::class.java)
-        method.isAccessible = true
-        return method.invoke(AiDocumentAnalyzer, file, text) as AiDocumentAnalyzer.Analysis
+    private fun invokeLocalAnalysis(
+        file: File,
+        text: String,
+        verifiedTotal: SpatialReceiptTotalExtractor.Total
+    ): AiDocumentAnalyzer.Analysis {
+        val previousVerifier = AiDocumentAnalyzer.spatialTotalVerifier
+        AiDocumentAnalyzer.spatialTotalVerifier = { verifiedTotal }
+        return try {
+            val method = AiDocumentAnalyzer::class.java.getDeclaredMethod("localAnalysis", File::class.java, String::class.java)
+            method.isAccessible = true
+            method.invoke(AiDocumentAnalyzer, file, text) as AiDocumentAnalyzer.Analysis
+        } finally {
+            AiDocumentAnalyzer.spatialTotalVerifier = previousVerifier
+        }
     }
 }
