@@ -54,14 +54,16 @@ object SpatialReceiptTotalExtractor {
     private fun findBestTotal(result: Text): Total? {
         val tokens = result.textBlocks
             .flatMap { it.lines }
-            .flatMap { line ->
-                line.elements.flatMap { element -> toTokens(element) }
+            .flatMapIndexed { lineId, line ->
+                line.elements.flatMap { element -> toTokens(element, lineId, line.text) }
             }
 
         return ReceiptTotalSpatialResolver.resolve(tokens.map {
             ReceiptTotalSpatialResolver.Token(
                 text = it.text,
-                box = ReceiptTotalSpatialResolver.Box(it.left, it.top, it.right, it.bottom)
+                box = ReceiptTotalSpatialResolver.Box(it.left, it.top, it.right, it.bottom),
+                lineId = it.lineId,
+                lineText = it.lineText
             )
         })?.let {
             Total(it.amount, it.currency, it.confidence)
@@ -73,20 +75,24 @@ object SpatialReceiptTotalExtractor {
         val left: Int,
         val top: Int,
         val right: Int,
-        val bottom: Int
+        val bottom: Int,
+        val lineId: Int,
+        val lineText: String
     )
 
     /**
      * Produces geometry-bearing tokens from ML Kit Elements. When an amount is embedded
      * in a larger OCR element, Symbol boxes are used to recover the amount's actual region.
+     * The original Text.Line text is preserved so a word such as TOTAL embedded in a
+     * product description cannot be promoted to a financial-summary label.
      */
-    private fun toTokens(element: Text.Element): List<SpatialToken> {
+    private fun toTokens(element: Text.Element, lineId: Int, lineText: String): List<SpatialToken> {
         val box = element.boundingBox ?: return emptyList()
         val text = element.text
         if (text.isBlank()) return emptyList()
 
         val tokens = mutableListOf<SpatialToken>()
-        tokens += SpatialToken(text, box.left, box.top, box.right, box.bottom)
+        tokens += SpatialToken(text, box.left, box.top, box.right, box.bottom, lineId, lineText)
 
         val symbols = element.symbols
         if (symbols.isEmpty()) return tokens
@@ -102,7 +108,9 @@ object SpatialReceiptTotalExtractor {
                         left = symbolBoxes.minOf { it.left },
                         top = symbolBoxes.minOf { it.top },
                         right = symbolBoxes.maxOf { it.right },
-                        bottom = symbolBoxes.maxOf { it.bottom }
+                        bottom = symbolBoxes.maxOf { it.bottom },
+                        lineId = lineId,
+                        lineText = lineText
                     )
                 }
             }
