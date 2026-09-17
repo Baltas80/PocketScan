@@ -15,7 +15,9 @@ object SpatialReceiptTotalExtractor {
     data class Total(val amount: Double, val currency: String?, val confidence: Double)
 
     private const val RENDER_WIDTH = 2200
-    private const val MAX_PAGES = 3
+    // Inspect all pages up to a bounded safety limit. A three-page cap could silently
+    // miss the total on a later page of a multi-page invoice.
+    private const val MAX_PAGES = 15
     private val amountRegex = Regex("(?<!\\d)(\\d{1,3}(?:[.,]\\d{3})*(?:[.,]\\d{2})|\\d+[.,]\\d{2})(?!\\d)")
 
     fun extract(pdf: File): Total? {
@@ -54,9 +56,7 @@ object SpatialReceiptTotalExtractor {
         val tokens = result.textBlocks
             .flatMap { it.lines }
             .flatMap { line ->
-                line.elements.map { element ->
-                    toTokens(element, line)
-                }.flatten()
+                line.elements.flatMap { element -> toTokens(element) }
             }
 
         return ReceiptTotalSpatialResolver.resolve(tokens.map {
@@ -81,7 +81,7 @@ object SpatialReceiptTotalExtractor {
      * Produces geometry-bearing tokens from ML Kit Elements. When an amount is embedded
      * in a larger OCR element, Symbol boxes are used to recover the amount's actual region.
      */
-    private fun toTokens(element: Text.Element, line: Text.Line): List<SpatialToken> {
+    private fun toTokens(element: Text.Element): List<SpatialToken> {
         val box = element.boundingBox ?: return emptyList()
         val text = element.text
         if (text.isBlank()) return emptyList()
