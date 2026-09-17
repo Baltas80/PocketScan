@@ -7,6 +7,7 @@ import com.google.firebase.ai.type.GenerativeBackend
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import java.io.File
+import java.text.Normalizer
 import java.util.Locale
 
 object AiLibraryAssistant {
@@ -25,33 +26,12 @@ object AiLibraryAssistant {
                 return@runCatching insufficientMessage(languageCode())
             }
 
-            // Totals are accounting data. Verify them independently of the language
-            // model and never accept an item price merely because the OCR contains the
-            // word TOTAL somewhere in a product description.
-            if (asksTotal(question)) {
-                val verified = documents.mapNotNull { file ->
-                    val textFile = File(file.parentFile, "${file.nameWithoutExtension}.txt")
-                    if (!textFile.isFile) return@mapNotNull null
-                    val text = runCatching { textFile.readText(Charsets.UTF_8) }.getOrDefault("")
-                    ReceiptTotalExtractor.extract(text)?.let { file to it }
-                }
-
-                if (verified.size == 1) {
-                    return@runCatching exactOcrTotalAnswer(verified.single().second)
-                }
-                if (verified.size > 1) {
-                    val currencies = verified.map { it.second.currency }.distinct()
-                    if (currencies.size == 1) {
-                        val sum = verified.sumOf { it.second.amount }
-                        return@runCatching exactOcrAggregateAnswer(sum, currencies.single(), verified.size)
-                    }
-                }
+            if (asksVerifiedFinancialQuestion(question)) {
+                return@runCatching answerVerifiedFinancial(question, queryResult.matches)
             }
 
             val context = AiLibraryQueryEngine.buildContext(queryResult).take(30000)
-            tryCloud(question, context).getOrElse { error ->
-                cloudFailure(error)
-            }
+            tryCloud(question, context).getOrElse { error -> cloudFailure(error) }
         }
     }
 
@@ -65,8 +45,8 @@ object AiLibraryAssistant {
             You are PocketScan's document library assistant.
             Answer ONLY from the structured library results supplied below. Never invent facts.
             Respect the filters already applied by the local query engine.
-            For totals, use only an explicitly verified document total. Never substitute an
-            item price, subtotal, tax amount, cash received or change.
+            Monetary totals shown as VERIFIED_TOTAL are authoritative only when present.
+            Do not derive or guess monetary values from raw OCR text or summaries.
             Respond in ${languageName()} and keep the answer concise.
 
             USER QUESTION:
@@ -81,41 +61,85 @@ object AiLibraryAssistant {
         "Gemini conectado\n\n$answer"
     }
 
+    private fun asksVerifiedFinancialQuestion(question: String): Boolean {
+        val normalized = normalize(question)
+        return listOf(
+            "total", "importe", "cuanto", "suma", "gaste", "gastado", "gasto",
+            "mas caro", "más caro", "mas cara", "más cara", "expensive", "spent", "iva", "vat"
+        ).any { normalized.contains(it) }
+    }
+
+    private fun answerVerifiedFinancial(question: String, matches: List<AiLibraryQueryEngine.Match>): String {
+        val normalized = normalize(question)
+        if (normalized.contains("iva") || normalized.contains("vat")) {
+            val amounts = matches.map { parseExplicitCurrencyAmount(it.analysis?.fields?.get("iva")) }
+            if (amounts.any { it == null }) return insufficientMessage(languageCode())
+            val nonNull = amounts.filterNotNull()
+            val currencies = nonNull.map { it.second }.distinct()
+            if (currencies.size != 1) return insufficientMessage(languageCode())
+            return verifiedAmountAnswer(nonNull.sumOf { it.first }, currencies.single(), "IVA verificado")
+        }
+
+        if (normalized.contains("mas caro") || normalized.contains("más caro") ||
+            normalized.contains("mas cara") || normalized.contains("más cara") || normalized.contains("expensive")) {
+            if (matches.any { it.total == null || it.currency == null }) return insufficientMessage(languageCode())
+            val currencies = matches.map { it.currency!! }.distinct()
+            if (currencies.size != 1) return insufficientMessage(languageCode())
+            val candidate = matches.maxByOrNull { it.total!! } ?: return insufficientMessage(languageCode())
+            val name = candidate.analysis?.title?.takeIf { it.isNotBlank() } ?: candidate.file.name
+            return if (languageCode() == "es") {
+                "Factura más cara entre los documentos verificados: $name — ${format(candidate.total!!)} ${candidate.currency}."
+            } else {
+                "Most expensive invoice among verified documents: $name — ${format(candidate.total!!)} ${candidate.currency}."
+            }
+        }
+
+        if (matches.any { it.total == null || it.currency == null }) return insufficientMessage(languageCode())
+        val currencies = matches.map { it.currency!! }.distinct()
+        if (currencies.size != 1) return insufficientMessage(languageCode())
+        return verifiedAmountAnswer(
+            matches.sumOf { it.total!! },
+            currencies.single(),
+            if (matches.size == 1) "Total verificado" else "Total verificado de ${matches.size} documentos"
+        )
+    }
+
+    private fun parseExplicitCurrencyAmount(value: String?): Pair<Double, String>? {
+        if (value.isNullOrBlank() || value.contains('%')) return null
+        val currency = when {
+            value.contains("EUR", true) || value.contains('€') -> "EUR"
+            value.contains("USD", true) || value.contains('$') -> "USD"
+            value.contains("GBP", true) || value.contains('£') -> "GBP"
+            else -> return null
+        }
+        val raw = Regex("[+-]?[0-9][0-9.,\\s]*").find(value)?.value ?: return null
+        val normalized = raw.replace("\\s".toRegex(), "")
+        val number = runCatching {
+            when {
+                normalized.contains(',') && normalized.contains('.') -> {
+                    if (normalized.lastIndexOf(',') > normalized.lastIndexOf('.')) {
+                        normalized.replace(".", "").replace(',', '.')
+                    } else normalized.replace(",", "")
+                }
+                normalized.count { it == ',' } == 1 && normalized.substringAfter(',').length <= 2 -> normalized.replace(',', '.')
+                normalized.count { it == '.' } > 1 -> normalized.replace(".", "")
+                else -> normalized
+            }.toDouble()
+        }.getOrNull() ?: return null
+        return number to currency
+    }
+
+    private fun verifiedAmountAnswer(total: Double, currency: String, label: String): String =
+        "$label: ${format(total)} $currency."
+
+    private fun format(value: Double): String = "%.2f".format(Locale.US, value).replace('.', ',')
+
     private fun cloudFailure(error: Throwable): String {
         val root = generateSequence(error) { it.cause }.lastOrNull() ?: error
         val detail = root.message?.trim().orEmpty().take(500).ifBlank { root::class.java.simpleName }
         return when (languageCode()) {
             "es" -> "Gemini no está disponible.\n\nDiagnóstico: $detail"
             else -> "Gemini is unavailable.\n\nDiagnostic: $detail"
-        }
-    }
-
-    private fun asksTotal(question: String): Boolean {
-        val normalized = normalize(question)
-        return normalized.contains("total") ||
-            normalized.contains("cuanto") ||
-            normalized.contains("importe") ||
-            normalized.contains("suma") ||
-            normalized.contains("sum")
-    }
-
-    private fun exactOcrTotalAnswer(total: ReceiptTotalExtractor.Total): String {
-        val formatted = "%.2f".format(Locale.US, total.amount).replace('.', ',')
-        val amount = total.currency?.let { "$formatted $it" } ?: formatted
-        return if (languageCode() == "es") {
-            "Total verificado por OCR: $amount."
-        } else {
-            "OCR-verified total: $amount."
-        }
-    }
-
-    private fun exactOcrAggregateAnswer(total: Double, currency: String?, count: Int): String {
-        val formatted = "%.2f".format(Locale.US, total).replace('.', ',')
-        val amount = currency?.let { "$formatted $it" } ?: formatted
-        return if (languageCode() == "es") {
-            "Total verificado por OCR de los $count documentos: $amount."
-        } else {
-            "OCR-verified total of $count documents: $amount."
         }
     }
 
@@ -130,13 +154,13 @@ object AiLibraryAssistant {
     }
 
     private fun insufficientMessage(language: String): String = when (language) {
-        "es" -> "No encuentro información suficiente en la biblioteca para responder a esa pregunta."
-        "fr" -> "Je ne trouve pas suffisamment d’informations dans la bibliothèque pour répondre."
-        "de" -> "Ich finde in der Bibliothek nicht genügend Informationen für diese Frage."
-        "it" -> "Non trovo informazioni sufficienti nella libreria per rispondere."
-        "pt" -> "Não encontro informação suficiente na biblioteca para responder."
-        "ca" -> "No trobo prou informació a la biblioteca per respondre."
-        else -> "I cannot find enough information in the library to answer that question."
+        "es" -> "No encuentro información suficiente en la biblioteca para responder con seguridad."
+        "fr" -> "Je ne trouve pas suffisamment d’informations dans la bibliothèque pour répondre avec fiabilité."
+        "de" -> "Ich finde in der Bibliothek nicht genügend Informationen für eine verlässliche Antwort."
+        "it" -> "Non trovo informazioni sufficienti nella libreria per rispondere con affidabilità."
+        "pt" -> "Não encontro informação suficiente na biblioteca para responder com segurança."
+        "ca" -> "No trobo prou informació a la biblioteca per respondre amb seguretat."
+        else -> "I cannot find enough verified information in the library to answer safely."
     }
 
     private fun languageCode(): String = Locale.getDefault().language.lowercase(Locale.ROOT)
@@ -152,5 +176,7 @@ object AiLibraryAssistant {
         else -> Locale.getDefault().displayLanguage
     }
 
-    private fun normalize(value: String): String = value.lowercase(Locale.ROOT)
+    private fun normalize(value: String): String = Normalizer.normalize(value.lowercase(Locale.ROOT), Normalizer.Form.NFD)
+        .replace("\\p{M}+".toRegex(), "")
+        .replace("ñ", "n")
 }
