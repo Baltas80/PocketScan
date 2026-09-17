@@ -1,8 +1,8 @@
 package com.baltas80.pocketscan
 
 import org.junit.Assert.assertEquals
-import org.junit.Assert.assertTrue
 import org.junit.Assert.assertNull
+import org.junit.Assert.assertTrue
 import org.junit.Test
 
 class ReceiptTotalSpatialResolverTest {
@@ -58,6 +58,45 @@ class ReceiptTotalSpatialResolverTest {
     }
 
     @Test
+    fun rejectsTotalWordEmbeddedInsideProductLine() {
+        val tokens = listOf(
+            lineToken("BARRA PRECOC 235G ALFARES TOTAL 5,00", "TOTAL", 100, 500),
+            lineToken("BARRA PRECOC 235G ALFARES TOTAL 5,00", "5,00", 700, 500),
+            lineToken("TOTAL 17,79", "TOTAL", 100, 650),
+            lineToken("TOTAL 17,79", "17,79", 700, 650)
+        )
+
+        val result = ReceiptTotalSpatialResolver.resolve(tokens)
+
+        assertEquals(17.79, result?.amount ?: -1.0, 0.001)
+    }
+
+    @Test
+    fun rejectsFiveRowsBelowEvenWhenAmountIsHorizontallyAligned() {
+        val tokens = listOf(
+            lineToken("TOTAL", "TOTAL", 100, 500),
+            lineToken("PRODUCTO 5,00", "5,00", 700, 700),
+            lineToken("OTRA FILA 17,79", "17,79", 700, 900)
+        )
+
+        assertNull(ReceiptTotalSpatialResolver.resolve(tokens))
+    }
+
+    @Test
+    fun doesNotUsePaymentArithmeticToInventMissingTotal() {
+        val tokens = listOf(
+            lineToken("PRODUCTO", "PRODUCTO", 100, 500),
+            lineToken("PRODUCTO 5,00", "5,00", 700, 500),
+            lineToken("EFECTIVO 20,00", "EFECTIVO", 100, 650),
+            lineToken("EFECTIVO 20,00", "20,00", 700, 650),
+            lineToken("CAMBIO 2,21", "CAMBIO", 100, 700),
+            lineToken("CAMBIO 2,21", "2,21", 700, 700)
+        )
+
+        assertNull(ReceiptTotalSpatialResolver.resolve(tokens))
+    }
+
+    @Test
     fun paymentArithmeticRaisesConfidenceForSpatiallyValidTotal() {
         val base = listOf(
             token("TOTAL", 100, 500),
@@ -100,5 +139,17 @@ class ReceiptTotalSpatialResolverTest {
         ReceiptTotalSpatialResolver.Token(
             text = text,
             box = ReceiptTotalSpatialResolver.Box(left, top, left + 100, top + 30)
+        )
+
+    private fun lineToken(
+        lineText: String,
+        text: String,
+        left: Int,
+        top: Int
+    ): ReceiptTotalSpatialResolver.Token =
+        ReceiptTotalSpatialResolver.Token(
+            text = text,
+            box = ReceiptTotalSpatialResolver.Box(left, top, left + 100, top + 30),
+            lineText = lineText
         )
 }
