@@ -24,7 +24,7 @@ object AiLibraryQueryEngine {
 
     private val stopWords = setOf(
         "de", "del", "la", "el", "los", "las", "un", "una", "y", "en", "por", "para", "con",
-        "que", "me", "mis", "mi", "a", "al", "the", "of", "and", "in", "for", "with", "what",
+        "que", "me", "mis", "mi", "a", "al", "es", "the", "of", "and", "in", "for", "with", "what",
         "which", "how", "much", "many", "show", "list", "find", "total", "suma", "sum", "cuanto",
         "cuántas", "cuantas", "dime", "muestra", "buscar", "encuentra", "quiero", "hay", "cual", "fue"
     )
