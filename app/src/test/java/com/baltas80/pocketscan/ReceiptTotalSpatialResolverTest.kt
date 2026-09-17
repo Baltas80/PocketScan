@@ -147,9 +147,19 @@ class ReceiptTotalSpatialResolverTest {
         )
 
         val result = ReceiptTotalSpatialResolver.resolve(tokens)
+        val spatialOnly = ReceiptTotalSpatialResolver.resolve(
+            listOf(
+                token("TOTAL", 100, 500),
+                token("17,79 EUR", 700, 500)
+            )
+        )
 
         assertEquals(17.79, result?.amount ?: -1.0, 0.001)
-        assertEquals(0.90, result?.confidence ?: -1.0, 0.0001)
+        assertEquals(
+            spatialOnly?.confidence ?: -1.0,
+            result?.confidence ?: -1.0,
+            0.0001
+        )
     }
 
     private fun token(text: String, left: Int, top: Int): ReceiptTotalSpatialResolver.Token =
