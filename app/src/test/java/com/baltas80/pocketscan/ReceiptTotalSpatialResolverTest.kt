@@ -85,6 +85,17 @@ class ReceiptTotalSpatialResolverTest {
         assertNull(ReceiptTotalSpatialResolver.resolve(tokens))
     }
 
+    @Test
+    fun recognizesPunctuationAndMultilingualTotalLabels() {
+        val labels = listOf("TOTAL:", "TOTAL A PAGAR", "MONTANT TOTAL", "GESAMTBETRAG", "TOTALE DA PAGARE")
+        labels.forEach { label ->
+            val result = ReceiptTotalSpatialResolver.resolve(
+                listOf(token(label, 100, 500), token("17,79 €", 700, 500))
+            )
+            assertEquals(label, 17.79, result?.amount ?: -1.0, 0.001)
+        }
+    }
+
     private fun token(text: String, left: Int, top: Int): ReceiptTotalSpatialResolver.Token =
         ReceiptTotalSpatialResolver.Token(
             text = text,
