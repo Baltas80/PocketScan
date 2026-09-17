@@ -2,6 +2,7 @@ package com.baltas80.pocketscan
 
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
+import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Test
 import java.io.File
@@ -128,7 +129,53 @@ class AiDocumentAnalyzerTest {
         }
     }
 
-    @Suppress("UNCHECKED_CAST")
+    @Test
+    fun falseLinearOcrTotalCannotOverrideVerifiedSpatialTotal() {
+        val root = Files.createTempDirectory("pocketscan-total-regression").toFile()
+        try {
+            val pdf = File(root, "ticket.pdf").apply { writeText("pdf") }
+            val text = """
+                Ticket
+                BARRA 5,00
+                TOTAL 5,00
+                TOTAL
+                17,79
+                EFECTIVO 20,00
+                CAMBIO 2,21
+            """.trimIndent()
+            val analysis = invokeLocalAnalysis(pdf, text, SpatialReceiptTotalExtractor.Total(17.79, "EUR", 0.99))
+            assertEquals("17,79", analysis.fields["total"])
+            assertTrue(analysis.source.contains("spatial-verified"))
+        } finally {
+            root.deleteRecursively()
+        }
+    }
+
+    @Test
+    fun unverifiedSpatialTotalIsRemovedInsteadOfPersistingModelOrOcrGuess() {
+        val root = Files.createTempDirectory("pocketscan-unverified-total").toFile()
+        try {
+            val pdf = File(root, "ticket.pdf").apply { writeText("pdf") }
+            val text = """
+                Ticket
+                TOTAL: 5,00
+            """.trimIndent()
+            val previousVerifier = AiDocumentAnalyzer.spatialTotalVerifier
+            AiDocumentAnalyzer.spatialTotalVerifier = { null }
+            try {
+                val method = AiDocumentAnalyzer::class.java.getDeclaredMethod("localAnalysis", File::class.java, String::class.java)
+                method.isAccessible = true
+                val analysis = method.invoke(AiDocumentAnalyzer, pdf, text) as AiDocumentAnalyzer.Analysis
+                assertNull(analysis.fields["total"])
+                assertTrue(analysis.source.contains("total-unverified"))
+            } finally {
+                AiDocumentAnalyzer.spatialTotalVerifier = previousVerifier
+            }
+        } finally {
+            root.deleteRecursively()
+        }
+    }
+
     private fun invokeLocalAnalysis(
         file: File,
         text: String,
