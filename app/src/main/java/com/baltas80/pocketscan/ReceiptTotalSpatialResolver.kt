@@ -25,6 +25,8 @@ object ReceiptTotalSpatialResolver {
     )
 
     fun resolve(tokens: List<Token>): Candidate? {
+        if (tokens.isEmpty()) return null
+
         val normalized = tokens.map { it.copy(text = normalize(it.text)) }
         val labels = normalized.filter { isTotalLabel(it.text) }
         if (labels.isEmpty()) return null
@@ -36,10 +38,14 @@ object ReceiptTotalSpatialResolver {
                 }
             }
         }
+        if (amounts.isEmpty()) return null
 
-        // A TOTAL is valid only when its value has independent geometry and is
-        // physically adjacent to the label in the same row. OCR reading order is
-        // never used to establish this relationship.
+        val documentWidth = (normalized.maxOfOrNull { it.box.right } ?: 0) -
+            (normalized.minOfOrNull { it.box.left } ?: 0)
+
+        // A TOTAL value may be far to the right on a narrow receipt. The horizontal
+        // relationship is therefore bounded by both token scale and document width,
+        // rather than by an arbitrary fixed pixel distance.
         for (label in labels) {
             val labelBox = label.box
             val candidates = amounts
@@ -47,12 +53,16 @@ object ReceiptTotalSpatialResolver {
                 .filterNot { isNegativeOrNonTotalContext(it.token.text) }
                 .filter { sameRow(labelBox, it.token.box) }
                 .filter { it.token.box.left >= labelBox.right - horizontalTolerance(labelBox, it.token.box) }
-                .filter { horizontalGap(labelBox, it.token.box) <= maxHorizontalGap(labelBox, it.token.box) }
-                .sortedBy { horizontalGap(labelBox, it.token.box) }
+                .filter { horizontalGap(labelBox, it.token.box) <= maxHorizontalGap(labelBox, it.token.box, documentWidth) }
+                .sortedWith(compareBy<CandidateToken> { horizontalGap(labelBox, it.token.box) })
                 .toList()
 
             candidates.firstOrNull()?.let {
-                return Candidate(it.amount, it.currency, confidence = confidence(labelBox, it.token.box))
+                return Candidate(
+                    amount = it.amount,
+                    currency = it.currency,
+                    confidence = confidence(labelBox, it.token.box, documentWidth)
+                )
             }
         }
 
@@ -74,14 +84,20 @@ object ReceiptTotalSpatialResolver {
 
     private fun horizontalGap(a: Box, b: Box): Int = (b.left - a.right).coerceAtLeast(0)
 
-    private fun maxHorizontalGap(a: Box, b: Box): Int = (maxOf(a.height, b.height) * 8).coerceAtLeast(24)
+    private fun maxHorizontalGap(a: Box, b: Box, documentWidth: Int): Int {
+        val scaledTokenLimit = maxOf(a.height, b.height) * 20
+        val documentLimit = if (documentWidth > 0) (documentWidth * 0.75f).toInt() else scaledTokenLimit
+        return minOf(scaledTokenLimit, documentLimit).coerceAtLeast(24)
+    }
 
     private fun horizontalTolerance(a: Box, b: Box): Int = (maxOf(a.height, b.height) * 0.35f).toInt()
 
-    private fun confidence(label: Box, amount: Box): Double {
+    private fun confidence(label: Box, amount: Box, documentWidth: Int): Double {
         val gap = horizontalGap(label, amount).toDouble()
-        val scale = maxOf(label.height, amount.height).coerceAtLeast(1).toDouble()
-        return (0.99 - (gap / scale) * 0.01).coerceIn(0.90, 0.99)
+        val width = documentWidth.coerceAtLeast(1).toDouble()
+        val rowScore = 1.0
+        val horizontalScore = (1.0 - (gap / width)).coerceIn(0.0, 1.0)
+        return (0.80 + rowScore * 0.10 + horizontalScore * 0.10).coerceIn(0.0, 0.99)
     }
 
     private fun isNegativeOrNonTotalContext(text: String): Boolean =
