@@ -15,9 +15,6 @@ object SpatialReceiptTotalExtractor {
     data class Total(val amount: Double, val currency: String?, val confidence: Double)
 
     private const val RENDER_WIDTH = 2200
-    // Inspect all pages up to a bounded safety limit. A three-page cap could silently
-    // miss the total on a later page of a multi-page invoice.
-    private const val MAX_PAGES = 15
     private val amountRegex = Regex("(?<!\\d)(\\d{1,3}(?:[.,]\\d{3})*(?:[.,]\\d{2})|\\d+[.,]\\d{2})(?!\\d)")
 
     fun extract(pdf: File): Total? {
@@ -27,7 +24,9 @@ object SpatialReceiptTotalExtractor {
             ParcelFileDescriptor.open(pdf, ParcelFileDescriptor.MODE_READ_ONLY).use { descriptor ->
                 PdfRenderer(descriptor).use { renderer ->
                     var best: Total? = null
-                    for (index in 0 until renderer.pageCount.coerceAtMost(MAX_PAGES)) {
+                    // Do not silently cap the page count: a total on a later page must
+                    // not be missed and then replaced by a weaker earlier-page guess.
+                    for (index in 0 until renderer.pageCount) {
                         renderer.openPage(index).use { page ->
                             val ratio = page.height.toFloat() / page.width.toFloat()
                             val height = (RENDER_WIDTH * ratio).toInt().coerceAtLeast(1)
