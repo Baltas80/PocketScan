@@ -81,6 +81,7 @@ object ReceiptTotalSpatialResolver {
                                 candidate.token.box,
                                 documentWidth,
                                 candidate.amount,
+                                candidate.currency,
                                 cash,
                                 change
                             )
@@ -154,6 +155,7 @@ object ReceiptTotalSpatialResolver {
         amount: Box,
         documentWidth: Int,
         amountValue: Double,
+        amountCurrency: String?,
         cash: CandidateToken?,
         change: CandidateToken?
     ): Double {
@@ -164,13 +166,17 @@ object ReceiptTotalSpatialResolver {
         var score = 0.89 + horizontalScore * 0.08
 
         // Arithmetic is validation only; it can never create a TOTAL candidate.
-        if (cash != null && change != null) {
+        // It is only meaningful when all known payment values use the same currency.
+        if (cash != null && change != null && currenciesCompatible(amountCurrency, cash.currency) && currenciesCompatible(amountCurrency, change.currency)) {
             val reconciles = abs((amountValue + change.amount) - cash.amount) <= 0.01
             if (reconciles) score += 0.02
         }
 
         return score.coerceIn(0.0, 0.99)
     }
+
+    private fun currenciesCompatible(first: String?, second: String?): Boolean =
+        first == null || second == null || first == second
 
     private fun findPaymentAmount(
         tokens: List<Token>,
