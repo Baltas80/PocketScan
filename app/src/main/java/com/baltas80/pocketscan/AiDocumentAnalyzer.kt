@@ -81,7 +81,8 @@ $auxiliaryOcr""".trimIndent())
         val verified = runCatching { spatialTotalVerifier(file) }.getOrNull()
         val fields = analysis.fields.toMutableMap()
         return if (verified != null && verified.confidence >= 0.90) {
-            fields["total"] = formatVerifiedAmount(verified.amount)
+            val originalTotal = fields["total"]
+            fields["total"] = formatVerifiedAmount(verified.amount, originalTotal)
             verified.currency?.let { fields["moneda"] = it }
             analysis.copy(fields = fields, source = analysis.source + "+spatial-verified")
         } else {
@@ -90,8 +91,22 @@ $auxiliaryOcr""".trimIndent())
         }
     }
 
-    private fun formatVerifiedAmount(value: Double): String =
-        java.math.BigDecimal.valueOf(value).setScale(2, java.math.RoundingMode.HALF_UP).toPlainString()
+    private fun formatVerifiedAmount(value: Double, reference: String?): String {
+        val normalized = java.math.BigDecimal.valueOf(value).setScale(2, java.math.RoundingMode.HALF_UP).toPlainString()
+        val decimalComma = reference?.let {
+            val comma = it.lastIndexOf(',')
+            val dot = it.lastIndexOf('.')
+            comma >= 0 && comma > dot && it.length - comma - 1 == 2
+        } == true
+        if (!decimalComma) return normalized
+
+        val parts = normalized.split('.')
+        if (parts.size != 2) return normalized
+        val integer = parts[0]
+        val fraction = parts[1]
+        val grouped = integer.reversed().chunked(3).joinToString(".").reversed()
+        return "$grouped,$fraction"
+    }
 
     private fun localAnalysis(file: File, text: String): Analysis {
         val category = DocumentOrganizer.categoryForText(text)
