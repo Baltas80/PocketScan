@@ -135,6 +135,33 @@ class ReceiptTotalSpatialResolverTest {
         }
     }
 
+    @Test
+    fun doesNotBoostConfidenceWhenPaymentCurrenciesConflict() {
+        val tokens = listOf(
+            token("TOTAL", 100, 500),
+            token("17,79 EUR", 700, 500),
+            token("EFECTIVO", 100, 600),
+            token("20,00 USD", 700, 600),
+            token("CAMBIO", 100, 700),
+            token("2,21 USD", 700, 700)
+        )
+
+        val result = ReceiptTotalSpatialResolver.resolve(tokens)
+        val spatialOnly = ReceiptTotalSpatialResolver.resolve(
+            listOf(
+                token("TOTAL", 100, 500),
+                token("17,79 EUR", 700, 500)
+            )
+        )
+
+        assertEquals(17.79, result?.amount ?: -1.0, 0.001)
+        assertEquals(
+            spatialOnly?.confidence ?: -1.0,
+            result?.confidence ?: -1.0,
+            0.0001
+        )
+    }
+
     private fun token(text: String, left: Int, top: Int): ReceiptTotalSpatialResolver.Token =
         ReceiptTotalSpatialResolver.Token(
             text = text,
