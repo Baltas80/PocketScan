@@ -17,6 +17,9 @@ import java.util.Locale
 object AiDocumentAnalyzer {
     private const val MAX_INLINE_PDF_BYTES = 14_000_000L
     data class Analysis(val category: String, val title: String, val summary: String, val fields: Map<String, String>, val source: String = "local")
+    /** Test seam for the spatial monetary verifier; production uses the real extractor. */
+    @Volatile
+    internal var spatialTotalVerifier: (File) -> SpatialReceiptTotalExtractor.Total? = SpatialReceiptTotalExtractor::extract
     private val documentSchema: Schema by lazy { Schema.obj(mapOf("category" to Schema.enumeration(listOf("FACTURAS","PRESUPUESTOS","CONTRATOS","RECIBOS","TICKETS","NOMINAS","CERTIFICADOS","INFORMES","CITAS","GENERAL")),"title" to Schema.string(),"summary" to Schema.string(),"proveedor" to Schema.string(),"cliente" to Schema.string(),"nif_cif" to Schema.string(),"numero" to Schema.string(),"fecha" to Schema.string(),"vencimiento" to Schema.string(),"subtotal" to Schema.string(),"iva" to Schema.string(),"total" to Schema.string(),"moneda" to Schema.string(),"periodo" to Schema.string(),"direccion" to Schema.string(),"telefono" to Schema.string(),"concepto" to Schema.string()),optionalProperties=listOf("proveedor","cliente","nif_cif","numero","fecha","vencimiento","subtotal","iva","total","moneda","periodo","direccion","telefono","concepto")) }
 
     suspend fun analyze(file: File, ocrText: String = ""): Result<Analysis> = withContext(Dispatchers.IO) {
@@ -75,7 +78,7 @@ $auxiliaryOcr""".trimIndent())
         )
         if (!financialCategory || !file.extension.equals("pdf", true)) return analysis
 
-        val verified = runCatching { SpatialReceiptTotalExtractor.extract(file) }.getOrNull()
+        val verified = runCatching { spatialTotalVerifier(file) }.getOrNull()
         val fields = analysis.fields.toMutableMap()
         return if (verified != null && verified.confidence >= 0.90) {
             fields["total"] = formatVerifiedAmount(verified.amount)
