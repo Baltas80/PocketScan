@@ -24,11 +24,9 @@ object AiPdfAssistant {
 
         flow {
             try {
-                val normalizedQuestion = normalize(question)
-
                 // A monetary TOTAL is a critical data field. Never let the LLM choose a
                 // number when the document extractor cannot independently verify the field.
-                if (isTotalQuestion(normalizedQuestion)) {
+                if (DocumentQuestionClassifier.isTotalQuestion(question)) {
                     val verified = SpatialReceiptTotalExtractor.extract(file)
                     if (verified != null && verified.confidence >= 0.90) {
                         emit(exactTotalAnswer(verified))
@@ -123,15 +121,6 @@ object AiPdfAssistant {
         }
     }
 
-    private fun isTotalQuestion(question: String): Boolean {
-        val hasTotalTerm = Regex("\\b(total|totales|importe total|total a pagar|total factura|grand total|amount due|balance due|montant total|gesamtbetrag|totale da pagare)\\b")
-            .containsMatchIn(question)
-        val excludesPaymentOnly = Regex("\\b(cash|efectivo|pag[eé]|pague|paid|payment|cambio|change)\\b")
-            .containsMatchIn(question)
-        return hasTotalTerm && !excludesPaymentOnly
-    }
-
-    private fun normalize(value: String): String = value.lowercase(Locale.ROOT)
     private fun languageCode(): String = Locale.getDefault().language.lowercase(Locale.ROOT)
     private fun languageName(): String = when (languageCode()) {
         "es" -> "Spanish (Spain)"
