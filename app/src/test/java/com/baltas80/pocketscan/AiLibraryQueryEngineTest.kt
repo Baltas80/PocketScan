@@ -2,6 +2,7 @@ package com.baltas80.pocketscan
 
 import java.io.File
 import java.nio.file.Files
+import java.util.Locale
 import org.json.JSONObject
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNull
@@ -89,7 +90,7 @@ class AiLibraryQueryEngineTest {
                 17,79
             """.trimIndent())
 
-            val result = AiLibraryQueryEngine.query("total", listOf(pdf))
+            val result = AiLibraryQueryEngine.query("¿Cuál es el total?", listOf(pdf))
 
             assertEquals(1, result.matches.size)
             assertNull(result.matches.single().total)
@@ -106,7 +107,7 @@ class AiLibraryQueryEngineTest {
             val pdf = document(dir, "ticket.pdf", "17,79 EUR", source = "local+spatial-verified")
             File(dir, "ticket.txt").writeText("TOTAL 5,00\n17,79\n")
 
-            val result = AiLibraryQueryEngine.query("total", listOf(pdf))
+            val result = AiLibraryQueryEngine.query("¿Cuál es el total?", listOf(pdf))
 
             assertEquals(1, result.matches.size)
             assertEquals(17.79, result.matches.single().total!!, 0.001)
@@ -122,7 +123,7 @@ class AiLibraryQueryEngineTest {
         val dir = tempDir()
         try {
             val pdf = document(dir, "ticket.pdf", "5,00 EUR", source = "test")
-            val context = AiLibraryQueryEngine.buildContext(AiLibraryQueryEngine.query("ticket", listOf(pdf)))
+            val context = AiLibraryQueryEngine.buildContext(AiLibraryQueryEngine.query("¿Cuál es el total?", listOf(pdf)))
 
             assertTrue(!context.contains("5,00 EUR"))
             assertTrue(context.contains("VERIFIED_TOTAL="))
