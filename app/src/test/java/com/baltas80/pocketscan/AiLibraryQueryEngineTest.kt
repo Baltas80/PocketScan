@@ -10,7 +10,7 @@ import org.junit.Test
 
 class AiLibraryQueryEngineTest {
     @Test
-    fun queryIgnoresNonPdfFilesAndUsesOcrSidecar() {
+    fun queryIgnoresNonPdfFilesAndUsesOcrSidecarForLexicalSearch() {
         val dir = tempDir()
         try {
             val pdf = File(dir, "scan.pdf").apply { writeText("pdf") }
@@ -42,32 +42,33 @@ class AiLibraryQueryEngineTest {
     }
 
     @Test
-    fun amountFiltersSupportSpanishComparisons() {
+    fun amountFiltersUseOnlySpatiallyVerifiedTotals() {
         val dir = tempDir()
         try {
-            val small = document(dir, "small.pdf", "500,00 EUR")
-            val large = document(dir, "large.pdf", "1.500,00 EUR")
+            val unverifiedLarge = document(dir, "unverified.pdf", "1500,00 EUR", source = "test")
+            val verifiedLarge = document(dir, "verified.pdf", "1200,00 EUR", source = "local+spatial-verified")
 
-            val result = AiLibraryQueryEngine.query("más de 1000", listOf(small, large))
+            val result = AiLibraryQueryEngine.query("más de 1000", listOf(unverifiedLarge, verifiedLarge))
 
             assertEquals(1, result.matches.size)
-            assertEquals(large, result.matches.single().file)
+            assertEquals(verifiedLarge, result.matches.single().file)
+            assertEquals(1200.0, result.matches.single().total!!, 0.001)
         } finally {
             dir.deleteRecursively()
         }
     }
 
     @Test
-    fun aggregateTotalIsCalculatedOnlyForSingleCurrency() {
+    fun aggregateTotalIsCalculatedOnlyForVerifiedSingleCurrency() {
         val dir = tempDir()
         try {
-            val first = document(dir, "first.pdf", "10 EUR")
-            val second = document(dir, "second.pdf", "20 EUR")
+            val first = document(dir, "first.pdf", "10 EUR", source = "local+spatial-verified")
+            val second = document(dir, "second.pdf", "20 EUR", source = "gemini+spatial-verified")
             val euros = AiLibraryQueryEngine.query("total", listOf(first, second))
             assertEquals(30.0, euros.aggregateTotal!!, 0.001)
             assertEquals("EUR", euros.aggregateCurrency)
 
-            val dollars = document(dir, "third.pdf", "5 USD")
+            val dollars = document(dir, "third.pdf", "5 USD", source = "local+spatial-verified")
             val mixed = AiLibraryQueryEngine.query("total", listOf(first, dollars))
             assertNull(mixed.aggregateTotal)
             assertNull(mixed.aggregateCurrency)
@@ -77,10 +78,10 @@ class AiLibraryQueryEngineTest {
     }
 
     @Test
-    fun ocrTotalSplitAcrossLinesOverridesAiTotal() {
+    fun flattenedOcrCannotOverrideStoredUnverifiedTotal() {
         val dir = tempDir()
         try {
-            val pdf = document(dir, "ticket.pdf", "5,00 EUR")
+            val pdf = document(dir, "ticket.pdf", "5,00 EUR", source = "test")
             File(dir, "ticket.txt").writeText("""
                 BARRA PRECOC 235G 3,80
                 5,00 x 0,76
@@ -92,7 +93,22 @@ class AiLibraryQueryEngineTest {
             val result = AiLibraryQueryEngine.query("total", listOf(pdf))
 
             assertEquals(1, result.matches.size)
-            assertEquals(17.79, result.matches.single().total!!, 0.001)
+            assertNull(result.matches.single().total)
+            assertNull(result.aggregateTotal)
+        } finally {
+            dir.deleteRecursively()
+        }
+    }
+
+    @Test
+    fun buildContextDoesNotExposeUnverifiedTotal() {
+        val dir = tempDir()
+        try {
+            val pdf = document(dir, "ticket.pdf", "5,00 EUR", source = "test")
+            val context = AiLibraryQueryEngine.buildContext(AiLibraryQueryEngine.query("ticket", listOf(pdf)))
+
+            assertTrue(!context.contains("5,00 EUR"))
+            assertTrue(context.contains("VERIFIED_TOTAL="))
         } finally {
             dir.deleteRecursively()
         }
@@ -103,7 +119,8 @@ class AiLibraryQueryEngineTest {
         name: String,
         total: String,
         category: String = "FACTURAS",
-        date: String? = null
+        date: String? = null,
+        source: String = "local+spatial-verified"
     ): File {
         val pdf = File(dir, name).apply { writeText("pdf") }
         val fields = JSONObject().put("total", total).apply {
@@ -111,7 +128,7 @@ class AiLibraryQueryEngineTest {
         }
         val json = JSONObject()
             .put("version", 1)
-            .put("source", "test")
+            .put("source", source)
             .put("category", category)
             .put("title", name)
             .put("summary", "")
