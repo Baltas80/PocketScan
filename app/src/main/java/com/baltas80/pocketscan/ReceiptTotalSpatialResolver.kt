@@ -1,5 +1,6 @@
 package com.baltas80.pocketscan
 
+import java.text.Normalizer
 import java.util.Locale
 import kotlin.math.abs
 
@@ -21,10 +22,10 @@ object ReceiptTotalSpatialResolver {
     private val amountRegex = Regex("(?<!\\d)(\\d{1,3}(?:[.,]\\d{3})*(?:[.,]\\d{2})|\\d+[.,]\\d{2})(?!\\d)")
     private val totalLabels = setOf(
         "total", "total due", "amount due", "balance due", "grand total",
-        "importe total", "importe final", "total general", "total factura",
-        "tutar", "genel toplam"
+        "importe total", "importe final", "importe a pagar", "total a pagar", "total general", "total factura",
+        "tutar", "genel toplam", "montant", "montant total", "a payer", "gesamt", "gesamtbetrag", "zu zahlen",
+        "totale", "totale da pagare", "valor total", "total pagar"
     )
-    private val paymentLabels = setOf("cash", "efectivo", "change", "cambio")
     private val changeLabels = setOf("change", "cambio")
     private val cashLabels = setOf("cash", "efectivo")
 
@@ -32,7 +33,7 @@ object ReceiptTotalSpatialResolver {
         if (tokens.isEmpty()) return null
 
         val normalized = tokens.map { it.copy(text = normalize(it.text)) }
-        val labels = normalized.filter { isTotalLabel(it.text) }
+        val labels = normalized.filter { it.text in totalLabels }
         if (labels.isEmpty()) return null
 
         val amounts = normalized.flatMap { token ->
@@ -50,9 +51,6 @@ object ReceiptTotalSpatialResolver {
         val cash = findPaymentAmount(normalized, amounts, cashLabels)
         val change = findPaymentAmount(normalized, amounts, changeLabels)
 
-        // Score every geometrically valid TOTAL/amount pair instead of returning
-        // the first OCR match. This makes the result deterministic when OCR order
-        // is wrong or multiple TOTAL-like regions exist.
         return labels.asSequence()
             .flatMap { label ->
                 amounts.asSequence()
@@ -88,10 +86,6 @@ object ReceiptTotalSpatialResolver {
     private data class CandidateToken(val token: Token, val amount: Double, val currency: String?)
     private data class ScoredCandidate(val candidate: CandidateToken, val score: Double)
 
-    private fun isTotalLabel(text: String): Boolean = text.trim().let { value ->
-        value in totalLabels
-    }
-
     private fun sameRow(a: Box, b: Box): Boolean {
         val overlap = minOf(a.bottom, b.bottom) - maxOf(a.top, b.top)
         val minHeight = minOf(a.height, b.height)
@@ -123,9 +117,6 @@ object ReceiptTotalSpatialResolver {
 
         var score = 0.80 + 0.10 + horizontalScore * 0.10
 
-        // Independent payment arithmetic is strong corroborating evidence:
-        // TOTAL + CHANGE = CASH. It never creates a TOTAL by itself; it only
-        // increases confidence for an already spatially valid candidate.
         if (cash != null && change != null) {
             val reconciles = abs((amountValue + change.amount) - cash.amount) <= 0.01
             if (reconciles) score += 0.05
@@ -180,8 +171,10 @@ object ReceiptTotalSpatialResolver {
         else -> null
     }
 
-    private fun normalize(text: String): String = text.lowercase(Locale.ROOT)
-        .replace('á', 'a').replace('é', 'e').replace('í', 'i').replace('ó', 'o')
-        .replace('ú', 'u').replace('ü', 'u')
+    private fun normalize(text: String): String = Normalizer.normalize(text, Normalizer.Form.NFD)
+        .replace(Regex("\\p{M}+"), "")
+        .lowercase(Locale.ROOT)
         .trim()
+        .replace(Regex("^[\\p{Punct}\\s]+|[\\p{Punct}\\s]+$"), "")
+        .replace(Regex("\\s+"), " ")
 }
