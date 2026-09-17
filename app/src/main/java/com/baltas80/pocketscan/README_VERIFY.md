@@ -1,0 +1,1 @@
+This placeholder file is temporary and will be replaced by the verified-library hardening change.
