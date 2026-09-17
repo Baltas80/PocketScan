@@ -48,40 +48,19 @@ object AiMetadataStore {
             json.optJSONObject("fields")?.optString(key)?.trim()?.takeIf { it.isNotEmpty() }?.let { fields[key] = it }
         }
 
-        val ocr = File(document.parentFile ?: document, "${document.nameWithoutExtension}.txt")
-        val verified = if (ocr.isFile) findExplicitTotal(ocr.readText(Charsets.UTF_8)) else null
-        if (verified != null) {
-            fields["total"] = verified.first
-            verified.second?.let { fields["moneda"] = it }
-        }
-
-        val baseSource = json?.optString("source", "local") ?: "ocr"
-        val source = baseSource + if (verified != null) "+ocr-verified" else ""
+        // Do not re-derive financial totals from the flattened OCR TXT sidecar here.
+        // That path loses geometry and can resurrect the historical "TOTAL 5,00"
+        // failure after a spatially verified value was already persisted. Monetary
+        // verification is performed during analysis and its provenance is stored in
+        // the metadata source field.
         AiDocumentAnalyzer.Analysis(
             json?.optString("category", DocumentOrganizer.GENERAL) ?: DocumentOrganizer.GENERAL,
             json?.optString("title", document.nameWithoutExtension) ?: document.nameWithoutExtension,
             json?.optString("summary", "") ?: "",
             fields,
-            source
+            json?.optString("source", "local") ?: "local"
         )
     }.getOrNull()
-
-    private fun findExplicitTotal(ocrText: String): Pair<String, String?>? {
-        val label = Regex("(?i)^\\s*(?:total(?:\\s+a\\s+pagar)?|importe\\s+(?:total|final)|total\\s+general|total\\s+factura)\\s*(?:[.·:_-]\\s*)*")
-        val amount = Regex("(?i)([0-9]{1,3}(?:[.][0-9]{3})*(?:,[0-9]{1,2})|[0-9]+(?:[.,][0-9]{1,2}))(?:\\s*(€|EUR|USD|\\$|GBP|£))?\\s*$")
-        val currency = Regex("(?i)(€|EUR|USD|\\$|GBP|£)")
-        for (line in ocrText.lineSequence()) {
-            val clean = line.trim()
-            val labelMatch = label.find(clean) ?: continue
-            val suffix = clean.substring(labelMatch.range.last + 1).trim()
-            val match = amount.find(suffix) ?: continue
-            val value = match.groupValues[1]
-            val unit = match.groupValues.getOrNull(2)?.takeIf { it.isNotBlank() }
-                ?: currency.find(suffix)?.groupValues?.getOrNull(1)
-            return value to unit?.let { normalizeCurrency(it) }
-        }
-        return null
-    }
 
     private fun normalizeCurrency(value: String): String = when (value.uppercase()) {
         "€", "EUR" -> "EUR"
