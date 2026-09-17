@@ -53,19 +53,19 @@ object AiLibraryQueryEngine {
 
         val matches = documents.asSequence()
             .filter { it.isFile && it.extension.equals("pdf", true) }
-            .map { file -> file to verifiedAnalysis(file, AiMetadataStore.load(file)) }
+            .map { file -> file to AiMetadataStore.load(file) }
             .filter { (file, analysis) ->
                 val corpus = normalize(buildCorpus(file, analysis))
                 val categoryOk = category == null || analysis?.category?.let { categoryKey(it) } == category
                 val yearOk = year == null || extractYear(analysis?.fields?.get("fecha")) == year
-                val amount = extractAmount(analysis?.fields?.get("total"))
+                val amount = verifiedAmount(analysis)
                 val amountOk = amountFilter == null || amountFilter.matches(amount)
                 val lexicalScore = tokens.count { token -> containsWord(corpus, token) }
                 val hasStructuredFilter = category != null || year != null || amountFilter != null
                 categoryOk && yearOk && amountOk && (tokens.isEmpty() || lexicalScore > 0 || hasStructuredFilter)
             }
             .map { (file, analysis) ->
-                val parsed = extractAmount(analysis?.fields?.get("total"))
+                val parsed = verifiedAmount(analysis)
                 Match(file, analysis, parsed?.first, parsed?.second?.takeIf { it.isNotBlank() })
             }
             .sortedBy { it.file.name.lowercase(Locale.ROOT) }
@@ -74,11 +74,8 @@ object AiLibraryQueryEngine {
 
         val currencies = matches.mapNotNull { it.currency }.distinct()
         val aggregateCurrency = currencies.singleOrNull()
-        val aggregateTotal = if (aggregateCurrency != null) {
-            matches.mapNotNull { match -> match.total?.let { it to match.currency } }
-                .filter { it.second == aggregateCurrency }
-                .takeIf { it.isNotEmpty() }
-                ?.sumOf { it.first }
+        val aggregateTotal = if (aggregateCurrency != null && matches.isNotEmpty() && matches.all { it.total != null && it.currency == aggregateCurrency }) {
+            matches.sumOf { it.total!! }
         } else null
 
         return Result(matches, aggregateTotal, aggregateCurrency)
@@ -88,15 +85,15 @@ object AiLibraryQueryEngine {
         appendLine("MATCHES=${result.matches.size}")
         result.matches.take(30).forEachIndexed { index, match ->
             val a = match.analysis
+            val verified = verifiedAmount(a)
             append(index + 1).append(". FILE=").append(match.file.name)
             append(" | category=").append(a?.category ?: "GENERAL")
             append(" | title=").append(a?.title.orEmpty())
             append(" | date=").append(a?.fields?.get("fecha").orEmpty())
             append(" | supplier=").append(a?.fields?.get("proveedor").orEmpty())
             append(" | client=").append(a?.fields?.get("cliente").orEmpty())
-            append(" | VERIFIED_TOTAL=").append(match.total?.let(::formatAmount).orEmpty())
-            append(" | total=").append(a?.fields?.get("total").orEmpty())
-            append(" | currency=").append(match.currency.orEmpty())
+            append(" | VERIFIED_TOTAL=").append(verified?.first?.let(::formatAmount).orEmpty())
+            append(" | currency=").append(verified?.second.orEmpty())
             append(" | summary=").append(a?.summary.orEmpty().take(500))
             appendLine()
         }
@@ -153,50 +150,25 @@ object AiLibraryQueryEngine {
         return AmountFilter(mode, amount)
     }
 
-    private fun verifiedAnalysis(file: File, analysis: AiDocumentAnalyzer.Analysis?): AiDocumentAnalyzer.Analysis? {
-        if (analysis == null) return null
-        val ocr = File(file.parentFile, "${file.nameWithoutExtension}.txt")
-        val verified = if (ocr.isFile) findExplicitTotal(ocr.readText(Charsets.UTF_8)) else null
-        if (verified == null) return analysis
-
-        val fields = analysis.fields.toMutableMap()
-        fields["total"] = verified.first
-        verified.second?.let { fields["moneda"] = it }
-        return analysis.copy(fields = fields, source = analysis.source + "+ocr-verified")
+    private fun verifiedAmount(analysis: AiDocumentAnalyzer.Analysis?): Pair<Double, String>? {
+        if (analysis == null || !hasSpatialVerifiedSource(analysis.source)) return null
+        return extractAmount(analysis.fields["total"])
     }
 
-    private fun findExplicitTotal(ocrText: String): Pair<String, String?>? {
-        val lines = ocrText.lineSequence().map { it.trim() }.filter { it.isNotBlank() }.toList()
-        val label = Regex("(?i)^\\s*(?:total(?:\\s+a\\s+pagar)?|importe\\s+(?:total|final)|total\\s+general|total\\s+factura)\\b")
-        val amount = Regex("(?i)([0-9]{1,3}(?:[.][0-9]{3})*(?:,[0-9]{1,2})|[0-9]+(?:[.,][0-9]{1,2}))(?:\\s*(€|EUR|USD|\\$|GBP|£))?\\s*$")
-        val currency = Regex("(?i)(€|EUR|USD|\\$|GBP|£)")
-
-        fun parseSuffix(suffix: String): Pair<String, String?>? {
-            val match = amount.find(suffix) ?: return null
-            val value = match.groupValues[1]
-            val unit = match.groupValues.getOrNull(2)?.takeIf { it.isNotBlank() }
-                ?: currency.find(suffix)?.groupValues?.getOrNull(1)
-            return value to unit?.let { normalizeCurrency(it) }
-        }
-
-        lines.forEachIndexed { index, line ->
-            if (!label.containsMatchIn(line)) return@forEachIndexed
-            val labelMatch = label.find(line)
-            val suffix = line.substringAfter(labelMatch?.value ?: "", "").trim()
-            parseSuffix(suffix)?.let { return it }
-            for (offset in 1..2) {
-                val next = lines.getOrNull(index + offset) ?: break
-                parseSuffix(next)?.let { return it }
-            }
-        }
-        return null
-    }
+    private fun hasSpatialVerifiedSource(source: String): Boolean =
+        source.split('+').any { it.equals("spatial-verified", ignoreCase = true) }
 
     private fun buildCorpus(file: File, analysis: AiDocumentAnalyzer.Analysis?): String = buildString {
         append(file.name).append(' ')
         analysis?.let {
-            append(it.category).append(' ').append(it.title).append(' ').append(it.summary).append(' ')
-            it.fields.values.forEach { value -> append(value).append(' ') }
+            append(it.category).append(' ').append(it.title).append(' ')
+            if (hasSpatialVerifiedSource(it.source)) {
+                extractAmount(it.fields["total"])?.let { amount -> append(formatAmount(amount.first)).append(' ').append(amount.second).append(' ') }
+            }
+            append(it.summary).append(' ')
+            it.fields.forEach { (key, value) ->
+                if (key !in setOf("total", "subtotal")) append(value).append(' ')
+            }
         }
         val ocr = File(file.parentFile, "${file.nameWithoutExtension}.txt")
         if (ocr.isFile) append(ocr.readText(Charsets.UTF_8).take(12000))
@@ -262,13 +234,6 @@ object AiLibraryQueryEngine {
     private fun containsWord(text: String, word: String): Boolean {
         if (word.isBlank()) return false
         return Regex("(?:^|[^a-z0-9])${Regex.escape(word)}(?:$|[^a-z0-9])").containsMatchIn(text)
-    }
-
-    private fun normalizeCurrency(value: String): String = when (value.uppercase(Locale.ROOT)) {
-        "€", "EUR" -> "EUR"
-        "$", "USD" -> "USD"
-        "£", "GBP" -> "GBP"
-        else -> value
     }
 
     private fun formatAmount(value: Double): String = "%.2f".format(Locale.US, value)
