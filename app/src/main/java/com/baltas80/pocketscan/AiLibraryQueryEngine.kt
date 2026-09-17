@@ -26,7 +26,7 @@ object AiLibraryQueryEngine {
         "de", "del", "la", "el", "los", "las", "un", "una", "y", "en", "por", "para", "con",
         "que", "me", "mis", "mi", "a", "al", "the", "of", "and", "in", "for", "with", "what",
         "which", "how", "much", "many", "show", "list", "find", "total", "suma", "sum", "cuanto",
-        "cuántas", "cuantas", "dime", "muestra", "buscar", "encuentra", "quiero", "hay"
+        "cuántas", "cuantas", "dime", "muestra", "buscar", "encuentra", "quiero", "hay", "cual", "fue"
     )
 
     private val categoryAliases = mapOf(
@@ -58,14 +58,14 @@ object AiLibraryQueryEngine {
                 val corpus = normalize(buildCorpus(file, analysis))
                 val categoryOk = category == null || analysis?.category?.let { categoryKey(it) } == category
                 val yearOk = year == null || extractYear(analysis?.fields?.get("fecha")) == year
-                val amount = extractAmount(analysis?.fields?.get("total"))
+                val amount = extractVerifiedAmount(analysis)
                 val amountOk = amountFilter == null || amountFilter.matches(amount)
                 val lexicalScore = tokens.count { token -> containsWord(corpus, token) }
                 val hasStructuredFilter = category != null || year != null || amountFilter != null
                 categoryOk && yearOk && amountOk && (tokens.isEmpty() || lexicalScore > 0 || hasStructuredFilter)
             }
             .map { (file, analysis) ->
-                val parsed = extractAmount(analysis?.fields?.get("total"))
+                val parsed = extractVerifiedAmount(analysis)
                 Match(file, analysis, parsed?.first, parsed?.second?.takeIf { it.isNotBlank() })
             }
             .sortedBy { it.file.name.lowercase(Locale.ROOT) }
@@ -74,11 +74,12 @@ object AiLibraryQueryEngine {
 
         val currencies = matches.mapNotNull { it.currency }.distinct()
         val aggregateCurrency = currencies.singleOrNull()
-        val aggregateTotal = if (aggregateCurrency != null) {
-            matches.mapNotNull { match -> match.total?.let { it to match.currency } }
-                .filter { it.second == aggregateCurrency }
-                .takeIf { it.isNotEmpty() }
-                ?.sumOf { it.first }
+        val aggregateTotal = if (
+            aggregateCurrency != null &&
+            matches.isNotEmpty() &&
+            matches.all { it.total != null && it.currency == aggregateCurrency }
+        ) {
+            matches.sumOf { it.total!! }
         } else null
 
         return Result(matches, aggregateTotal, aggregateCurrency)
@@ -95,7 +96,6 @@ object AiLibraryQueryEngine {
             append(" | supplier=").append(a?.fields?.get("proveedor").orEmpty())
             append(" | client=").append(a?.fields?.get("cliente").orEmpty())
             append(" | VERIFIED_TOTAL=").append(match.total?.let(::formatAmount).orEmpty())
-            append(" | total=").append(a?.fields?.get("total").orEmpty())
             append(" | currency=").append(match.currency.orEmpty())
             append(" | summary=").append(a?.summary.orEmpty().take(500))
             appendLine()
@@ -153,11 +153,6 @@ object AiLibraryQueryEngine {
         return AmountFilter(mode, amount)
     }
 
-    /**
-     * Never reconstruct a monetary total from the OCR sidecar's reading order.
-     * A persisted total is trusted only when the analyzer explicitly marked it as
-     * spatially verified, or when the current PDF independently passes the same verifier.
-     */
     private fun verifiedAnalysis(file: File, analysis: AiDocumentAnalyzer.Analysis?): AiDocumentAnalyzer.Analysis? {
         if (analysis == null) return null
         val financialCategory = analysis.category in setOf(
@@ -166,7 +161,7 @@ object AiLibraryQueryEngine {
             DocumentOrganizer.TICKETS
         )
         if (!financialCategory || !file.extension.equals("pdf", true)) return analysis
-        if (analysis.source.contains("+spatial-verified")) return analysis
+        if (hasSpatialVerifiedSource(analysis.source)) return analysis
 
         val verified = runCatching { AiDocumentAnalyzer.spatialTotalVerifier(file) }.getOrNull()
         val fields = analysis.fields.toMutableMap()
@@ -182,11 +177,21 @@ object AiLibraryQueryEngine {
         }
     }
 
+    private fun hasSpatialVerifiedSource(source: String): Boolean =
+        source.split('+').any { it.equals("spatial-verified", ignoreCase = true) }
+
+    private fun extractVerifiedAmount(analysis: AiDocumentAnalyzer.Analysis?): Pair<Double, String>? {
+        if (analysis == null || !hasSpatialVerifiedSource(analysis.source)) return null
+        return extractAmount(analysis.fields["total"])
+    }
+
     private fun buildCorpus(file: File, analysis: AiDocumentAnalyzer.Analysis?): String = buildString {
         append(file.name).append(' ')
         analysis?.let {
             append(it.category).append(' ').append(it.title).append(' ').append(it.summary).append(' ')
-            it.fields.values.forEach { value -> append(value).append(' ') }
+            it.fields.forEach { (key, value) ->
+                if (key != "total" || hasSpatialVerifiedSource(it.source)) append(value).append(' ')
+            }
         }
         val ocr = File(file.parentFile, "${file.nameWithoutExtension}.txt")
         if (ocr.isFile) append(ocr.readText(Charsets.UTF_8).take(12000))
