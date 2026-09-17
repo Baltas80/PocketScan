@@ -110,7 +110,7 @@ $auxiliaryOcr""".trimIndent())
         firstMatch(text,Regex("(?im)^\\s*(?:proveedor|emisor|empresa|entidad|supplier|vendor|issuer|company)\\s*[:.-]?\\s*([^\\r\\n]{3,100}?)\\s*$"))?.let{fields["proveedor"]=cleanField(it)}
         firstMatch(text,Regex("(?im)^\\s*(?:cliente|destinatario|beneficiario|titular|customer|client|recipient|beneficiary|account holder)\\s*[:.-]?\\s*([^\\r\\n]{3,100}?)\\s*$"))?.let{fields["cliente"]=cleanField(it)}
         val summary=if(text.isBlank())"No OCR disponible para un análisis local más preciso." else text.lineSequence().map{it.trim()}.filter{it.isNotBlank()&&!isOcrMarkerLine(it)}.joinToString(" ").replace(Regex("\\s+")," ").trim().take(700)
-        return Analysis(category,title,summary,fields)
+        return verifyCriticalMonetaryFields(file, Analysis(category,title,summary,fields))
     }
 
     private data class Match(val value:String,val currency:String?)
