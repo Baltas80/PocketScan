@@ -1,6 +1,7 @@
 package com.baltas80.pocketscan
 
 import java.util.Locale
+import kotlin.math.abs
 
 /**
  * Resolves receipt totals from OCR tokens while preserving their physical geometry.
@@ -23,6 +24,9 @@ object ReceiptTotalSpatialResolver {
         "importe total", "importe final", "total general", "total factura",
         "tutar", "genel toplam"
     )
+    private val paymentLabels = setOf("cash", "efectivo", "change", "cambio")
+    private val changeLabels = setOf("change", "cambio")
+    private val cashLabels = setOf("cash", "efectivo")
 
     fun resolve(tokens: List<Token>): Candidate? {
         if (tokens.isEmpty()) return null
@@ -43,33 +47,46 @@ object ReceiptTotalSpatialResolver {
         val documentWidth = (normalized.maxOfOrNull { it.box.right } ?: 0) -
             (normalized.minOfOrNull { it.box.left } ?: 0)
 
-        // A TOTAL value may be far to the right on a narrow receipt. The horizontal
-        // relationship is therefore bounded by both token scale and document width,
-        // rather than by an arbitrary fixed pixel distance.
-        for (label in labels) {
-            val labelBox = label.box
-            val candidates = amounts
-                .asSequence()
-                .filterNot { isNegativeOrNonTotalContext(it.token.text) }
-                .filter { sameRow(labelBox, it.token.box) }
-                .filter { it.token.box.left >= labelBox.right - horizontalTolerance(labelBox, it.token.box) }
-                .filter { horizontalGap(labelBox, it.token.box) <= maxHorizontalGap(labelBox, it.token.box, documentWidth) }
-                .sortedWith(compareBy<CandidateToken> { horizontalGap(labelBox, it.token.box) })
-                .toList()
+        val cash = findPaymentAmount(normalized, amounts, cashLabels)
+        val change = findPaymentAmount(normalized, amounts, changeLabels)
 
-            candidates.firstOrNull()?.let {
-                return Candidate(
-                    amount = it.amount,
-                    currency = it.currency,
-                    confidence = confidence(labelBox, it.token.box, documentWidth)
+        // Score every geometrically valid TOTAL/amount pair instead of returning
+        // the first OCR match. This makes the result deterministic when OCR order
+        // is wrong or multiple TOTAL-like regions exist.
+        return labels.asSequence()
+            .flatMap { label ->
+                amounts.asSequence()
+                    .filterNot { it.token.text == label.text && it.token.box == label.box }
+                    .filterNot { isNegativeOrNonTotalContext(it.token.text) }
+                    .filter { sameRow(label.box, it.token.box) }
+                    .filter { it.token.box.left >= label.box.right - horizontalTolerance(label.box, it.token.box) }
+                    .filter { horizontalGap(label.box, it.token.box) <= maxHorizontalGap(label.box, it.token.box, documentWidth) }
+                    .map { candidate ->
+                        ScoredCandidate(
+                            candidate = candidate,
+                            score = confidence(
+                                label.box,
+                                candidate.token.box,
+                                documentWidth,
+                                candidate.amount,
+                                cash,
+                                change
+                            )
+                        )
+                    }
+            }
+            .maxWithOrNull(compareBy<ScoredCandidate> { it.score })
+            ?.let { scored ->
+                Candidate(
+                    amount = scored.candidate.amount,
+                    currency = scored.candidate.currency,
+                    confidence = scored.score
                 )
             }
-        }
-
-        return null
     }
 
     private data class CandidateToken(val token: Token, val amount: Double, val currency: String?)
+    private data class ScoredCandidate(val candidate: CandidateToken, val score: Double)
 
     private fun isTotalLabel(text: String): Boolean = text.trim().let { value ->
         value in totalLabels
@@ -92,13 +109,51 @@ object ReceiptTotalSpatialResolver {
 
     private fun horizontalTolerance(a: Box, b: Box): Int = (maxOf(a.height, b.height) * 0.35f).toInt()
 
-    private fun confidence(label: Box, amount: Box, documentWidth: Int): Double {
+    private fun confidence(
+        label: Box,
+        amount: Box,
+        documentWidth: Int,
+        amountValue: Double,
+        cash: CandidateToken?,
+        change: CandidateToken?
+    ): Double {
         val gap = horizontalGap(label, amount).toDouble()
         val width = documentWidth.coerceAtLeast(1).toDouble()
-        val rowScore = 1.0
         val horizontalScore = (1.0 - (gap / width)).coerceIn(0.0, 1.0)
-        return (0.80 + rowScore * 0.10 + horizontalScore * 0.10).coerceIn(0.0, 0.99)
+
+        var score = 0.80 + 0.10 + horizontalScore * 0.10
+
+        // Independent payment arithmetic is strong corroborating evidence:
+        // TOTAL + CHANGE = CASH. It never creates a TOTAL by itself; it only
+        // increases confidence for an already spatially valid candidate.
+        if (cash != null && change != null) {
+            val reconciles = abs((amountValue + change.amount) - cash.amount) <= 0.01
+            if (reconciles) score += 0.05
+        }
+
+        return score.coerceIn(0.0, 0.99)
     }
+
+    private fun findPaymentAmount(
+        tokens: List<Token>,
+        amounts: List<CandidateToken>,
+        labels: Set<String>
+    ): CandidateToken? {
+        val paymentLabels = tokens.filter { it.text in labels }
+        return paymentLabels.asSequence()
+            .flatMap { label ->
+                amounts.asSequence()
+                    .filter { it.token.box.left >= label.box.right - horizontalTolerance(label.box, it.token.box) }
+                    .filter { sameRow(label.box, it.token.box) }
+                    .filter { horizontalGap(label.box, it.token.box) <= maxHorizontalGap(label.box, it.token.box, tokens.documentWidth()) }
+                    .map { it to horizontalGap(label.box, it.token.box) }
+            }
+            .minByOrNull { it.second }
+            ?.first
+    }
+
+    private fun List<Token>.documentWidth(): Int =
+        (maxOfOrNull { it.box.right } ?: 0) - (minOfOrNull { it.box.left } ?: 0)
 
     private fun isNegativeOrNonTotalContext(text: String): Boolean =
         Regex("\\b(subtotal|sub total|tax|kdv|vat|change|cash|tip|discount|indirim|descuento|cambio)\\b")
