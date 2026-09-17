@@ -72,7 +72,7 @@ class AiLibraryAssistantTest {
         return pdf
     }
 
-    private fun withSpanishLocale(block: () -> Unit) {
+    private suspend fun withSpanishLocale(block: suspend () -> Unit) {
         val previous = Locale.getDefault()
         Locale.setDefault(Locale("es", "ES"))
         try {
