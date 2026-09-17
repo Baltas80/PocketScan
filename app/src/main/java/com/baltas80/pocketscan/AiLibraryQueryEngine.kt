@@ -53,7 +53,7 @@ object AiLibraryQueryEngine {
 
         val matches = documents.asSequence()
             .filter { it.isFile && it.extension.equals("pdf", true) }
-            .map { file -> file to verifiedAnalysis(file, AiMetadataStore.load(file)) }
+            .map { file -> file to verifiedAnalysis(AiMetadataStore.load(file)) }
             .filter { (file, analysis) ->
                 val corpus = normalize(buildCorpus(file, analysis))
                 val categoryOk = category == null || analysis?.category?.let { categoryKey(it) } == category
@@ -153,28 +153,21 @@ object AiLibraryQueryEngine {
         return AmountFilter(mode, amount)
     }
 
-    private fun verifiedAnalysis(file: File, analysis: AiDocumentAnalyzer.Analysis?): AiDocumentAnalyzer.Analysis? {
+    /**
+     * Query-time code must not invoke OCR. Spatial verification is an ingestion-time
+     * invariant persisted with the metadata provenance. Re-OCRing every document for
+     * every library query would be expensive and would also make a read operation
+     * perform hidden document processing.
+     */
+    private fun verifiedAnalysis(analysis: AiDocumentAnalyzer.Analysis?): AiDocumentAnalyzer.Analysis? {
         if (analysis == null) return null
-        val financialCategory = analysis.category in setOf(
-            DocumentOrganizer.FACTURAS,
-            DocumentOrganizer.RECIBOS,
-            DocumentOrganizer.TICKETS
-        )
-        if (!financialCategory || !file.extension.equals("pdf", true)) return analysis
         if (hasSpatialVerifiedSource(analysis.source)) return analysis
 
-        val verified = runCatching { AiDocumentAnalyzer.spatialTotalVerifier(file) }.getOrNull()
         val fields = analysis.fields.toMutableMap()
-        return if (verified != null && verified.confidence >= 0.90) {
-            fields["total"] = java.math.BigDecimal.valueOf(verified.amount)
-                .setScale(2, java.math.RoundingMode.HALF_UP)
-                .toPlainString()
-            verified.currency?.let { fields["moneda"] = it }
-            analysis.copy(fields = fields, source = analysis.source + "+spatial-verified")
-        } else {
-            fields.remove("total")
-            analysis.copy(fields = fields, source = analysis.source + "+total-unverified")
+        if (fields.remove("total") != null) {
+            return analysis.copy(fields = fields, source = analysis.source + "+total-unverified")
         }
+        return analysis
     }
 
     private fun hasSpatialVerifiedSource(source: String): Boolean =
