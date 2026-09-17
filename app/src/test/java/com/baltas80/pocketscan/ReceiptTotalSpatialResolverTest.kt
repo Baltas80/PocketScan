@@ -1,6 +1,7 @@
 package com.baltas80.pocketscan
 
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertTrue
 import org.junit.Assert.assertNull
 import org.junit.Test
 
@@ -51,6 +52,34 @@ class ReceiptTotalSpatialResolverTest {
             token("5,00", 700, 500),
             token("TOTAL", 100, 650),
             token("17,79", 700, 800)
+        )
+
+        assertNull(ReceiptTotalSpatialResolver.resolve(tokens))
+    }
+
+    @Test
+    fun paymentArithmeticRaisesConfidenceForSpatiallyValidTotal() {
+        val base = listOf(
+            token("TOTAL", 100, 500),
+            token("17,79", 700, 500),
+            token("EFECTIVO", 100, 600),
+            token("20,00", 700, 600),
+            token("CAMBIO", 100, 700),
+            token("2,21", 700, 700)
+        )
+
+        val result = ReceiptTotalSpatialResolver.resolve(base)
+
+        assertEquals(17.79, result?.amount ?: -1.0, 0.001)
+        assertTrue((result?.confidence ?: 0.0) > 0.90)
+    }
+
+    @Test
+    fun doesNotAcceptAmountMerelyBecauseItIsTheClosestValueOnAnotherRow() {
+        val tokens = listOf(
+            token("TOTAL", 100, 500),
+            token("5,00", 200, 100),
+            token("17,79", 700, 650)
         )
 
         assertNull(ReceiptTotalSpatialResolver.resolve(tokens))
