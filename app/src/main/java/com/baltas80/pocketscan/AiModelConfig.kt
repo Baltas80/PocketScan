@@ -1,21 +1,27 @@
 package com.baltas80.pocketscan
 
+import com.google.android.gms.tasks.Tasks
 import com.google.firebase.remoteconfig.FirebaseRemoteConfig
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
-import kotlinx.coroutines.async
 import kotlinx.coroutines.Deferred
-import kotlin.coroutines.resume
-import kotlinx.coroutines.suspendCancellableCoroutine
+import kotlinx.coroutines.async
+import java.util.concurrent.TimeUnit
 
 /**
  * Runtime AI configuration. Remote Config can change the model without an app release.
- * The default remains safe if Remote Config has not been published yet.
+ * The value is bounded to an explicit allow-list so a bad Remote Config value cannot
+ * silently select an unsupported or unintended model.
  */
 object AiModelConfig {
     private const val MODEL_NAME_KEY = "ai_model_name"
     private const val DEFAULT_MODEL_NAME = "gemini-3.8-flash"
+    private const val REMOTE_CONFIG_TIMEOUT_SECONDS = 5L
+
+    private val allowedModels = setOf(
+        DEFAULT_MODEL_NAME
+    )
 
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
     @Volatile
@@ -32,16 +38,23 @@ object AiModelConfig {
 
     private suspend fun resolveModelName(): String {
         val config = FirebaseRemoteConfig.getInstance()
-        return suspendCancellableCoroutine { continuation ->
-            config.setDefaultsAsync(mapOf(MODEL_NAME_KEY to DEFAULT_MODEL_NAME))
-                .addOnCompleteListener {
-                    config.fetchAndActivate().addOnCompleteListener {
-                        val model = config.getString(MODEL_NAME_KEY)
-                            .trim()
-                            .ifBlank { DEFAULT_MODEL_NAME }
-                        if (continuation.isActive) continuation.resume(model)
-                    }
-                }
-        }
+        return runCatching {
+            Tasks.await(
+                config.setDefaultsAsync(mapOf(MODEL_NAME_KEY to DEFAULT_MODEL_NAME)),
+                REMOTE_CONFIG_TIMEOUT_SECONDS,
+                TimeUnit.SECONDS
+            )
+            Tasks.await(
+                config.fetchAndActivate(),
+                REMOTE_CONFIG_TIMEOUT_SECONDS,
+                TimeUnit.SECONDS
+            )
+            sanitizeModelName(config.getString(MODEL_NAME_KEY))
+        }.getOrDefault(DEFAULT_MODEL_NAME)
+    }
+
+    internal fun sanitizeModelName(value: String?): String {
+        val candidate = value?.trim().orEmpty()
+        return candidate.takeIf { it in allowedModels } ?: DEFAULT_MODEL_NAME
     }
 }
