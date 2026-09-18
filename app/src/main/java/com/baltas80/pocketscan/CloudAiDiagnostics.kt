@@ -49,11 +49,16 @@ object CloudAiDiagnostics {
             else -> Kind.UNKNOWN
         }
 
-        val detail = messages.firstOrNull()?.take(500)
+        val rawDetail = messages.firstOrNull()?.take(500)
             ?: chain.lastOrNull()?.javaClass?.simpleName
             ?: error.javaClass.simpleName
-        return Diagnostic(kind, detail)
+        return Diagnostic(kind, redactSensitive(rawDetail))
     }
+
+    private fun redactSensitive(detail: String): String = detail
+        .replace(Regex("(?i)(api[-_ ]?key|token|authorization|bearer)\\s*[:=]\\s*[^\\s,;]+"), "$1=<redacted>")
+        .replace(Regex("(?i)(https?://[^\\s?]+)[^\\s]*\\?[^\\s]*"), "$1?<redacted>")
+        .take(500)
 
     fun userMessage(error: Throwable, language: String): String {
         val diagnostic = classify(error)
