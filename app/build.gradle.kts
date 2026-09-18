@@ -57,7 +57,7 @@ dependencies {
     implementation("com.google.android.gms:play-services-mlkit-document-scanner:16.0.0")
     implementation("com.google.android.gms:play-services-ads:25.5.0")
     implementation("com.google.android.ump:user-messaging-platform:3.2.0")
-    implementation("com.google.guava:guava:33.2.1-android")
+    implementation("com.google.guava:guava:33.7.1-android")
 
     // Gemini through Firebase AI Logic.
     implementation(platform("com.google.firebase:firebase-bom:34.19.0"))
