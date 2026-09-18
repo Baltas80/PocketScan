@@ -134,14 +134,8 @@ object AiLibraryAssistant {
 
     private fun format(value: Double): String = "%.2f".format(Locale.US, value).replace('.', ',')
 
-    private fun cloudFailure(error: Throwable): String {
-        val root = generateSequence(error) { it.cause }.lastOrNull() ?: error
-        val detail = root.message?.trim().orEmpty().take(500).ifBlank { root::class.java.simpleName }
-        return when (languageCode()) {
-            "es" -> "Gemini no está disponible.\n\nDiagnóstico: $detail"
-            else -> "Gemini is unavailable.\n\nDiagnostic: $detail"
-        }
-    }
+    private fun cloudFailure(error: Throwable): String =
+        CloudAiDiagnostics.userMessage(error, languageCode())
 
     private fun noDocumentsMessage(): String = when (languageCode()) {
         "es" -> "No hay documentos indexados todavía."
