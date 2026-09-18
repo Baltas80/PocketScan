@@ -112,14 +112,8 @@ object AiPdfAssistant {
         "I cannot verify the document total with sufficient spatial evidence. I will not provide a number that could be incorrect."
     }
 
-    private fun cloudFailure(error: Throwable): String {
-        val root = generateSequence(error) { it.cause }.lastOrNull() ?: error
-        val detail = root.message?.trim().orEmpty().take(500).ifBlank { root::class.java.simpleName }
-        return when (languageCode()) {
-            "es" -> "Gemini no está disponible.\n\nDiagnóstico: $detail"
-            else -> "Gemini is unavailable.\n\nDiagnostic: $detail"
-        }
-    }
+    private fun cloudFailure(error: Throwable): String =
+        CloudAiDiagnostics.userMessage(error, languageCode())
 
     private fun languageCode(): String = Locale.getDefault().language.lowercase(Locale.ROOT)
     private fun languageName(): String = when (languageCode()) {
