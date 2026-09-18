@@ -50,5 +50,14 @@ class CloudAiDiagnosticsTest {
         )
         assertTrue(message.contains("API/cuota"))
         assertTrue(!message.contains(" at com."))
+
+        val redacted = CloudAiDiagnostics.userMessage(
+            IllegalStateException("apiKey=SECRET123 https://example.test/call?token=SECRET456"),
+            "es"
+        )
+        assertTrue(redacted.contains("apiKey=<redacted>"))
+        assertTrue(redacted.contains("https://example.test/call?<redacted>"))
+        assertTrue(!redacted.contains("SECRET123"))
+        assertTrue(!redacted.contains("SECRET456"))
     }
 }
