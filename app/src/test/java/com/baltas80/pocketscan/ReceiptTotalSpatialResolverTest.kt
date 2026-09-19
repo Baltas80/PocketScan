@@ -25,6 +25,28 @@ class ReceiptTotalSpatialResolverTest {
     }
 
     @Test
+    fun resolvesRealTotalWhenProductPriceAppearsFiveRowsAboveSummary() {
+        val tokens = listOf(
+            token("BARRA", 100, 100),
+            token("5,00", 700, 100),
+            token("OTRO PRODUCTO", 100, 220),
+            token("2,50", 700, 220),
+            token("OTRO PRODUCTO", 100, 280),
+            token("1,25", 700, 280),
+            token("OTRO PRODUCTO", 100, 340),
+            token("3,00", 700, 340),
+            token("OTRO PRODUCTO", 100, 400),
+            token("6,04", 700, 400),
+            token("TOTAL", 100, 460),
+            token("17,79", 700, 460)
+        )
+
+        val result = ReceiptTotalSpatialResolver.resolve(tokens)
+
+        assertEquals(17.79, result?.amount ?: -1.0, 0.001)
+    }
+
+    @Test
     fun rejectsAmountThatIsNotOnTheTotalRow() {
         val tokens = listOf(
             token("TOTAL", 100, 500),
