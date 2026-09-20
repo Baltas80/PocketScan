@@ -111,7 +111,7 @@ object ReceiptTotalSpatialResolver {
 
         if (!isStandaloneSummaryLabel(label) || b.top <= a.bottom) return null
 
-        val rowHeight = medianLineHeight(tokens).coerceAtLeast(a.height).coerceAtLeast(1)
+        val rowHeight = medianLineHeight(tokens).coerceAtLeast(a.height.toFloat()).coerceAtLeast(1f)
         val verticalRows = (b.top - a.bottom).toFloat() / rowHeight
         if (verticalRows > 3.0f) return null
 
