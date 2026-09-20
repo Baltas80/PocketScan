@@ -29,7 +29,10 @@ object CloudAiDiagnostics {
         val text = (names + " " + messages.joinToString(" ")).lowercase(Locale.ROOT)
 
         val kind = when {
-            text.contains("appcheck") || text.contains("app check") ||\n                text.contains("firebase ai logic has been deactivated") ||\n                text.contains("enforce firebase app check") ||\n                text.contains("unverified app check") || text.contains("app check token") -> Kind.APP_CHECK
+            text.contains("appcheck") || text.contains("app check") ||
+                text.contains("firebase ai logic has been deactivated") ||
+                text.contains("enforce firebase app check") ||
+                text.contains("unverified app check") || text.contains("app check token") -> Kind.APP_CHECK
             text.contains("unauthenticated") || text.contains("unauthorized") ||
                 text.contains("permission denied") || text.contains("http 401") ||
                 text.contains("http 403") || text.contains("status code 401") ||
@@ -41,7 +44,10 @@ object CloudAiDiagnostics {
             chain.any { it is UnknownHostException || it is IOException || it is TimeoutException } ||
                 text.contains("network") || text.contains("timed out") ||
                 text.contains("timeout") || text.contains("unavailable") -> Kind.NETWORK
-            text.contains("quota") || text.contains("rate limit") ||\n                text.contains("http 429") || text.contains("status code 429") ||\n                text.contains("api not enabled") || text.contains("billing") ||\n                text.contains("resource exhausted") -> Kind.API_OR_QUOTA
+            text.contains("quota") || text.contains("rate limit") ||
+                text.contains("http 429") || text.contains("status code 429") ||
+                text.contains("api not enabled") || text.contains("billing") ||
+                text.contains("resource exhausted") -> Kind.API_OR_QUOTA
             text.contains("firebaseapp") || text.contains("remote config") ||
                 text.contains("configuration") || text.contains("not initialized") -> Kind.CONFIGURATION
             else -> Kind.UNKNOWN
