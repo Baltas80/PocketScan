@@ -82,12 +82,13 @@ object ReceiptTotalSpatialResolver {
     internal fun resolveForTest(tokens: List<Token>): Candidate? = resolve(tokens)
 
     /**
-     * Scores only two legitimate spatial layouts:
-     *  1) label and amount on the same physical row;
-     *  2) a standalone summary label followed by a vertically aligned amount
-     *     in the same right-hand amount column, within a bounded summary block.
+     * Only two layouts are accepted:
+     * 1) TOTAL and amount share the same physical row; or
+     * 2) the label is a standalone summary label and the amount belongs to a
+     * separately established amount column (normally from payment/summary rows).
      *
-     * This deliberately rejects arbitrary OCR-order associations.
+     * A bare vertical relationship is deliberately insufficient: product rows
+     * between TOTAL and an amount must not turn that amount into the total.
      */
     private fun scoreCandidate(
         label: Token,
@@ -108,34 +109,37 @@ object ReceiptTotalSpatialResolver {
             return ScoredCandidate(candidate, score.coerceAtMost(0.99))
         }
 
-        // Some receipts print the TOTAL label and its amount on separate physical
-        // lines. Permit that layout only when the label is a standalone summary label,
-        // the amount is below it, and both occupy the same right-hand numeric column.
-        if (!isStandaloneSummaryLabel(label)) return null
-        if (b.top <= a.bottom) return null
+        if (!isStandaloneSummaryLabel(label) || b.top <= a.bottom) return null
 
         val rowHeight = medianLineHeight(tokens).coerceAtLeast(a.height).coerceAtLeast(1)
         val verticalRows = (b.top - a.bottom).toFloat() / rowHeight
-        if (verticalRows > 8.0f) return null
+        if (verticalRows > 3.0f) return null
 
-        val amountColumn = b.centerX >= documentWidth * 0.50f
-        if (!amountColumn) return null
+        // A separated-line total is accepted only when its X position matches a
+        // numeric column independently established by payment/summary amounts.
+        val referenceColumnX = listOfNotNull(cash, change)
+            .map { it.token.box.centerX }
+            .takeIf { it.isNotEmpty() }
+            ?.average()?.toFloat()
+            ?: return null
 
-        val xTolerance = maxOf(a.height, b.height) * 3.5f
-        val expectedAmountX = maxOf(a.centerX, documentWidth * 0.50f)
-        if (abs(b.centerX - expectedAmountX) > maxOf(xTolerance, documentWidth * 0.30f)) return null
+        val xTolerance = maxOf(a.height, b.height) * 2.5f
+        if (abs(b.centerX - referenceColumnX) > maxOf(xTolerance, documentWidth * 0.08f)) return null
 
-        // A candidate separated from the label by several lines is accepted only if
-        // the intervening region does not contain another explicit financial label.
+        // Any intervening product row or monetary field invalidates the separated
+        // association. This prevents a product price several rows below TOTAL from
+        // becoming the total merely because it shares the amount column.
         val intervening = tokens.filter { it.box.top > a.bottom && it.box.bottom < b.top }
-        if (intervening.any { it.text in totalLabels || it.text in cashLabels || it.text in changeLabels }) return null
+        if (intervening.any { token ->
+                amountRegex.containsMatchIn(token.text) ||
+                    token.text in totalLabels ||
+                    token.text in cashLabels ||
+                    token.text in changeLabels
+            }) return null
 
-        var score = 0.82 - (verticalRows * 0.025f)
+        var score = 0.82 - (verticalRows * 0.05f)
         if (reconciles(candidate.amount, cash, change)) score += 0.08
-        // Summary labels are stronger when the amount is near the lower portion of the page.
-        if (b.centerY > tokens.maxOf { it.box.centerY } * 0.55f) score += 0.03
-
-        return ScoredCandidate(candidate, score.coerceAtMost(0.97))
+        return ScoredCandidate(candidate, score.coerceAtMost(0.96))
     }
 
     private fun isValidTotalLabelContext(label: Token): Boolean {
