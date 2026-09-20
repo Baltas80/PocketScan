@@ -13,6 +13,15 @@ class CloudAiDiagnosticsTest {
             CloudAiDiagnostics.Kind.APP_CHECK,
             CloudAiDiagnostics.classify(error).kind
         )
+
+        val deactivated = IllegalStateException(
+            "403 PERMISSION_DENIED: Firebase AI Logic has been deactivated in this project. " +
+                "To resume using Firebase AI Logic, you must enforce Firebase App Check."
+        )
+        assertEquals(
+            CloudAiDiagnostics.Kind.APP_CHECK,
+            CloudAiDiagnostics.classify(deactivated).kind
+        )
     }
 
     @Test
@@ -20,6 +29,15 @@ class CloudAiDiagnosticsTest {
         val error = IllegalStateException("HTTP 403 permission denied")
         assertEquals(
             CloudAiDiagnostics.Kind.AUTHORIZATION,
+            CloudAiDiagnostics.classify(error).kind
+        )
+    }
+
+    @Test
+    fun identifiesQuotaFailuresIncludingHttp429() {
+        val error = IllegalStateException("HTTP 429 RESOURCE_EXHAUSTED: rate limit exceeded")
+        assertEquals(
+            CloudAiDiagnostics.Kind.API_OR_QUOTA,
             CloudAiDiagnostics.classify(error).kind
         )
     }
