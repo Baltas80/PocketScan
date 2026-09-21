@@ -105,7 +105,7 @@ object ReceiptTotalSpatialResolver {
             val gap = horizontalGap(a, b).toDouble()
             val width = documentWidth.coerceAtLeast(1).toDouble()
             var score = 0.90 + (1.0 - gap / width).coerceIn(0.0, 1.0) * 0.07
-            if (reconciles(candidate.amount, cash, change)) score += 0.02
+            if (reconciles(candidate, cash, change)) score += 0.02
             return ScoredCandidate(candidate, score.coerceAtMost(0.99))
         }
 
@@ -138,7 +138,7 @@ object ReceiptTotalSpatialResolver {
             }) return null
 
         var score = 0.82 - (verticalRows * 0.05f)
-        if (reconciles(candidate.amount, cash, change)) score += 0.08
+        if (reconciles(candidate, cash, change)) score += 0.08
         return ScoredCandidate(candidate, score.coerceAtMost(0.96))
     }
 
@@ -196,8 +196,14 @@ object ReceiptTotalSpatialResolver {
         .minByOrNull { it.second }
         ?.first
 
-    private fun reconciles(total: Double, cash: CandidateToken?, change: CandidateToken?): Boolean =
-        cash != null && change != null && abs((total + change.amount) - cash.amount) <= 0.01
+    private fun reconciles(total: CandidateToken, cash: CandidateToken?, change: CandidateToken?): Boolean =
+        cash != null && change != null &&
+            currenciesCompatible(total.currency, cash.currency) &&
+            currenciesCompatible(total.currency, change.currency) &&
+            abs((total.amount + change.amount) - cash.amount) <= 0.01
+
+    private fun currenciesCompatible(first: String?, second: String?): Boolean =
+        first == null || second == null || first == second
 
     private fun isNegativeOrNonTotalContext(text: String): Boolean =
         Regex("\\b(subtotal|sub total|tax|kdv|vat|change|cash|tip|discount|indirim|descuento|cambio)\\b")
