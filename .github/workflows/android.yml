@@ -33,28 +33,37 @@ jobs:
         run: gradle testDebugUnitTest --stacktrace
       - name: Build debug APK
         run: gradle assembleDebug --stacktrace
-      - name: Build release APK and AAB
-        run: gradle assembleRelease bundleRelease --stacktrace
-      - name: Run Android lint
-        run: gradle lintDebug --stacktrace
-      - name: Verify release artifacts
+      - name: Build release AAB
+        run: gradle bundleRelease --stacktrace
+      - name: Verify installable debug APK and release bundle
         shell: bash
         run: |
           set -euo pipefail
-          test -s app/build/outputs/apk/debug/app-debug.apk
-          test -s app/build/outputs/bundle/release/app-release.aab
-          release_apk="$(find app/build/outputs/apk/release -maxdepth 1 -type f -name '*release*.apk' -print -quit)"
-          test -n "$release_apk"
-          test -s "$release_apk"
-          echo "Debug APK: app/build/outputs/apk/debug/app-debug.apk"
-          echo "Release APK: $release_apk"
-          echo "Release AAB: app/build/outputs/bundle/release/app-release.aab"
-      - name: Upload APKs and AAB
+          debug_apk="app/build/outputs/apk/debug/app-debug.apk"
+          final_apk="app/build/outputs/apk/debug/PocketScan-final.apk"
+          release_aab="app/build/outputs/bundle/release/app-release.aab"
+
+          test -s "$debug_apk"
+          test -s "$release_aab"
+
+          # The debug APK is deliberately the sideload/test artifact. It is signed by
+          # the Android Gradle Plugin and is safe to install on a test device.
+          apksigner="$(find "$ANDROID_HOME/build-tools" -type f -name apksigner | sort -V | tail -1)"
+          test -x "$apksigner"
+          "$apksigner" verify --verbose "$debug_apk"
+          cp "$debug_apk" "$final_apk"
+
+          echo "Installable APK: $final_apk"
+          echo "Play bundle: $release_aab"
+
+      - name: Run Android lint
+        run: gradle lintDebug --stacktrace
+      - name: Upload installable APK and AAB
         uses: actions/upload-artifact@v4
         with:
           name: PocketScan-builds
           path: |
+            app/build/outputs/apk/debug/PocketScan-final.apk
             app/build/outputs/apk/debug/app-debug.apk
-            app/build/outputs/apk/release/*release*.apk
             app/build/outputs/bundle/release/app-release.aab
           if-no-files-found: error
