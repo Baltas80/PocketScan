@@ -6,14 +6,14 @@ import org.junit.Test
 class AiModelConfigTest {
     @Test
     fun blankModelFallsBackToDefault() {
-        assertEquals("gemini-3.8-flash", AiModelConfig.sanitizeModelName(""))
-        assertEquals("gemini-3.8-flash", AiModelConfig.sanitizeModelName(null))
+        assertEquals("gemini-2.5-flash", AiModelConfig.sanitizeModelName(""))
+        assertEquals("gemini-2.5-flash", AiModelConfig.sanitizeModelName(null))
     }
 
     @Test
     fun unsupportedModelFallsBackToDefault() {
         assertEquals(
-            "gemini-3.8-flash",
+            "gemini-2.5-flash",
             AiModelConfig.sanitizeModelName("gemini-unknown-model")
         )
     }
@@ -21,8 +21,8 @@ class AiModelConfigTest {
     @Test
     fun supportedModelIsPreserved() {
         assertEquals(
-            "gemini-3.8-flash",
-            AiModelConfig.sanitizeModelName("  gemini-3.8-flash  ")
+            "gemini-2.5-flash",
+            AiModelConfig.sanitizeModelName("  gemini-2.5-flash  ")
         )
     }
 }
