@@ -22,7 +22,6 @@
         <activity android:name=".PdfViewerActivity" />
         <activity android:name=".SmartScannerActivity" />
         <activity android:name=".DocumentsActivity" />
-        <activity android:name=".ScannerActivity" />
         <activity android:name=".MainActivity" android:exported="true">
             <intent-filter>
                 <action android:name="android.intent.action.MAIN" />
