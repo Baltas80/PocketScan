@@ -19,14 +19,14 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Checkout
-        uses: actions/checkout@v5
+        uses: actions/checkout@08c6903cd8c0fde910a37b834c2c0c19d9d97ee3 # v7.0.0
       - name: Set up JDK 17
-        uses: actions/setup-java@v5
+        uses: actions/setup-java@c5195efecf7bdf52807c6f64aa7b87af1c67c4e2 # v5.0.0
         with:
           distribution: temurin
           java-version: '17'
       - name: Set up Gradle
-        uses: gradle/actions/setup-gradle@v6
+        uses: gradle/actions/setup-gradle@dccdc79a15655f1d16553a6ea594523bc73b5057 # v6.0.0
         with:
           gradle-version: '8.13'
       - name: Run unit tests
@@ -59,7 +59,7 @@ jobs:
       - name: Run Android lint
         run: gradle lintDebug --stacktrace
       - name: Upload installable APK and AAB
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@86cae030d7830f3b8f7d3c7c17371ad2cfcb07b8 # v4.0.0
         with:
           name: PocketScan-builds
           path: |
