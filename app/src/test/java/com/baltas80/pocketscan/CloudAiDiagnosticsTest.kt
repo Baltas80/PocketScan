@@ -78,4 +78,21 @@ class CloudAiDiagnosticsTest {
         assertTrue(!redacted.contains("SECRET123"))
         assertTrue(!redacted.contains("SECRET456"))
     }
+
+    @Test
+    fun userMessageIncludesActionableHintPerKind() {
+        val appCheck = CloudAiDiagnostics.userMessage(
+            IllegalStateException("App Check token rejected"),
+            "es"
+        )
+        assertTrue(appCheck.contains("Acción:"))
+        assertTrue(appCheck.contains("App Check"))
+
+        val modelEn = CloudAiDiagnostics.userMessage(
+            IllegalStateException("Requested model not found"),
+            "en"
+        )
+        assertTrue(modelEn.contains("Action:"))
+        assertTrue(modelEn.contains("Remote Config"))
+    }
 }
