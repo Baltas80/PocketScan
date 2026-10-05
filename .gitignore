@@ -1,9 +1,52 @@
-*.iml
+# Gradle
 .gradle/
-/local.properties
-/.idea/
-/build/
-/captures/
+build/
+app/build/
+captures/
 .externalNativeBuild/
 .cxx/
-app/build/
+
+# Android Studio / IntelliJ
+*.iml
+.idea/
+local.properties
+
+# Signing artifacts & keystores (NEVER commit)
+*.jks
+*.keystore
+*.p12
+*.pk8
+keystore.properties
+signing.properties
+
+# Secrets & credentials
+.env
+.env.*
+*.pem
+service-account*.json
+secrets.json
+credentials.json
+
+# Firebase config (contains API keys; keep template only if needed)
+google-services.json
+Firebase-Config.zip
+
+# Backup & temp files
+*.bak
+*.tmp
+*.orig
+*~
+
+# OS junk
+.DS_Store
+Thumbs.db
+desktop.ini
+
+# IDE / editor junk
+.vscode/
+*.swp
+*.swo
+*#
+
+# Logs
+*.log
