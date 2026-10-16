@@ -82,7 +82,7 @@
     <string name="ocr_fix">Corregir OCR</string>
     <string name="export_txt">Exportar TXT</string>
     <string name="share_pdf">Compartir PDF</string>
-    <string name="lock_toggle_failed">No s'ha canviat el bloqueig</string>
+    <string name="lock_toggle_failed">No s’ha canviat el bloqueig</string>
     <string name="biometric_lock_disable">Desactivar bloqueig biomètric</string>
     <string name="ads_label">Publicitat</string>
     <string name="ai_analysis_title">Anàlisi intel·ligent</string>
