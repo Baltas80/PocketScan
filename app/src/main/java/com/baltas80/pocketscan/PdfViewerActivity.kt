@@ -173,7 +173,7 @@ class PdfViewerActivity : AppCompatActivity() {
                     if (analysis.summary.isNotBlank()) append("Resumen:\n${analysis.summary}\n\n")
                     if (fields.isNotBlank()) append("Datos extraídos:\n$fields")
                 }
-                AlertDialog.Builder(this@PdfViewerActivity).setTitle("Análisis inteligente").setMessage(message).setPositiveButton(android.R.string.ok, null).show()
+                AlertDialog.Builder(this@PdfViewerActivity).setTitle(R.string.ai_analysis_title).setMessage(message).setPositiveButton(android.R.string.ok, null).show()
             }.onFailure { error -> Toast.makeText(this@PdfViewerActivity, error.message ?: "No se pudo analizar el documento", Toast.LENGTH_LONG).show() }
         }
     }
@@ -182,7 +182,7 @@ class PdfViewerActivity : AppCompatActivity() {
         val input = EditText(this).apply { hint = "Ej.: ¿Cuál es el importe total?"; setSingleLine(false); minLines = 2; maxLines = 4 }
         val answer = TextView(this).apply { text = "La respuesta aparecerá aquí."; setTextIsSelectable(true); setPadding(0, 16, 0, 0) }
         val container = android.widget.LinearLayout(this).apply { orientation = android.widget.LinearLayout.VERTICAL; setPadding(24, 8, 24, 8); addView(input, android.widget.LinearLayout.LayoutParams(-1, -2)); addView(answer, android.widget.LinearLayout.LayoutParams(-1, -2)) }
-        val dialog = AlertDialog.Builder(this).setTitle("Preguntar sobre este documento").setView(container).setNegativeButton(android.R.string.cancel, null).setPositiveButton("Preguntar", null).create()
+        val dialog = AlertDialog.Builder(this).setTitle(R.string.ask_about_document).setView(container).setNegativeButton(android.R.string.cancel, null).setPositiveButton(R.string.ask, null).create()
         dialog.setOnShowListener {
             dialog.getButton(AlertDialog.BUTTON_POSITIVE).setOnClickListener {
                 val question = input.text.toString().trim()

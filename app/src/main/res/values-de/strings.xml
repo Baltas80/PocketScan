@@ -58,7 +58,6 @@
     <string name="ai_status_ready">KI: analysiert</string>
     <string name="ai_status_pending">KI: Analyse ausstehend</string>
     <string name="ai_analysis_started">KI-Analyse gestartet.</string>
-    <string name="home_eyebrow" translatable="false">DOKUMENTE, OHNE REIBUNGSVERLUST</string>
     <string name="home_headline">Alle Ihre Dokumente an einem Ort</string>
     <string name="home_description">Scannen Sie Dokumente, erstellen Sie PDFs, extrahieren Sie Text und nutzen Sie KI, um Ihre Inhalte bei Bedarf zu verstehen.</string>
     <string name="home_quick_title">Schnellzugriff</string>
@@ -67,26 +66,27 @@
     <string name="privacy_title">Datenschutz zuerst</string>
     <string name="privacy_short">Lokale Speicherung und biometrische Sperre.</string>
     <string name="documents_subtitle">Ihre Dokumentenbibliothek, übersichtlich und leicht abfragbar.</string>
-    <string name="ai_prompt_label" translatable="false">FRAGEN SIE IHRE BIBLIOTHEK</string>
     <string name="ai_examples_title">Schnelle Fragen</string>
     <string name="ai_response_title">Antwort</string>
-    <string name="home_app_title" translatable="false">PocketScan</string>
-    <string name="documents_badge" translatable="false">PDF</string>
     <string name="scanner_align_hint">Richten Sie das Dokument im Rahmen aus</string>
-    <string name="scanner_eyebrow" translatable="false">DOKUMENTEN-SCANNER</string>
     <string name="flash_off">Blitz: aus</string>
     <string name="flash_on">Blitz: an</string>
     <string name="capture">Aufnehmen</string>
     <string name="delete_last">Löschen</string>
     <string name="finish_save_pdf">Fertigstellen und PDF speichern</string>
-    <string name="pdf_viewer_eyebrow" translatable="false">DOKUMENT</string>
     <string name="close">Schließen</string>
-    <string name="smart_actions_title" translatable="false">SMART AKTIONEN</string>
-    <string name="ai_badge" translatable="false">KI</string>
     <string name="ocr_fix">OCR korrigieren</string>
     <string name="export_txt">TXT exportieren</string>
     <string name="share_pdf">PDF teilen</string>
-    <string name="ads_label" translatable="false">Werbung</string>
     <string name="lock_toggle_failed">Die Sperre konnte nicht geändert werden</string>
     <string name="biometric_lock_disable">Biometrische Sperre deaktivieren</string>
+    <string name="ads_label">Werbung</string>
+    <string name="ai_analysis_title">Intelligente Analyse</string>
+    <string name="ask_about_document">Zu diesem Dokument fragen</string>
+    <string name="smart_actions_title">SMART AKTIONEN</string>
+    <string name="home_app_title">PocketScan</string>
+    <string name="documents_badge">PDF</string>
+    <string name="ai_badge">IA</string>
+    <string name="pdf_viewer_eyebrow">DOCUMENTO</string>
+    <string name="scanner_eyebrow">ESCÁNER DE DOCUMENTOS</string>
 </resources>

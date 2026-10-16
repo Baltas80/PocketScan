@@ -92,4 +92,6 @@
          Google's public test unit while this value starts with REPLACE_WITH. Replace before release. -->
     <string name="admob_banner_unit_id" translatable="false">REPLACE_WITH_PRODUCTION_BANNER_UNIT_ID</string>
     <string name="ai_analysis_started">Análisis IA iniciado.</string>
+    <string name="ai_analysis_title">Análisis inteligente</string>
+    <string name="ask_about_document">Preguntar sobre este documento</string>
 </resources>

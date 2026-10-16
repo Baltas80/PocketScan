@@ -58,7 +58,6 @@
     <string name="ai_status_ready">IA: analizzato</string>
     <string name="ai_status_pending">IA: analisi in attesa</string>
     <string name="ai_analysis_started">Analisi IA avviata.</string>
-    <string name="home_eyebrow" translatable="false">DOCUMENTI, SENZA ATTRITI</string>
     <string name="home_headline">Tutti i tuoi documenti in un unico posto</string>
     <string name="home_description">Scansiona documenti, crea PDF, estrai testo e usa l’IA per capire i tuoi contenuti quando ti serve.</string>
     <string name="home_quick_title">Accessi rapidi</string>
@@ -67,26 +66,27 @@
     <string name="privacy_title">Privacy prima di tutto</string>
     <string name="privacy_short">Archiviazione locale e blocco biometrico.</string>
     <string name="documents_subtitle">La tua biblioteca documentale, pulita e facile da consultare.</string>
-    <string name="ai_prompt_label" translatable="false">CHIEDI ALLA TUA BIBLIOTECA</string>
     <string name="ai_examples_title">Domande rapide</string>
     <string name="ai_response_title">Risposta</string>
-    <string name="home_app_title" translatable="false">PocketScan</string>
-    <string name="documents_badge" translatable="false">PDF</string>
     <string name="scanner_align_hint">Allinea il documento dentro la cornice</string>
-    <string name="scanner_eyebrow" translatable="false">SCANSIONE DOCUMENTI</string>
     <string name="flash_off">Flash: spento</string>
     <string name="flash_on">Flash: acceso</string>
     <string name="capture">Scatta</string>
     <string name="delete_last">Elimina</string>
     <string name="finish_save_pdf">Termina e salva PDF</string>
-    <string name="pdf_viewer_eyebrow" translatable="false">DOCUMENTO</string>
     <string name="close">Chiudi</string>
-    <string name="smart_actions_title" translatable="false">AZIONI INTELLIGENTI</string>
-    <string name="ai_badge" translatable="false">IA</string>
     <string name="ocr_fix">Correggi OCR</string>
     <string name="export_txt">Esporta TXT</string>
     <string name="share_pdf">Condividi PDF</string>
-    <string name="ads_label" translatable="false">Pubblicità</string>
     <string name="lock_toggle_failed">Il blocco non è stato modificato</string>
     <string name="biometric_lock_disable">Disattiva blocco biometrico</string>
+    <string name="ads_label">Pubblicità</string>
+    <string name="ai_analysis_title">Analisi intelligente</string>
+    <string name="ask_about_document">Chiedi su questo documento</string>
+    <string name="smart_actions_title">AZIONI INTELLIGENTI</string>
+    <string name="home_app_title">PocketScan</string>
+    <string name="documents_badge">PDF</string>
+    <string name="ai_badge">IA</string>
+    <string name="pdf_viewer_eyebrow">DOCUMENTO</string>
+    <string name="scanner_eyebrow">ESCÁNER DE DOCUMENTOS</string>
 </resources>
