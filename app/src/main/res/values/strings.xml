@@ -69,5 +69,27 @@
     <string name="cloud_ai_unavailable">No hay conexión con la IA en la nube. Estos son los documentos locales relacionados:</string>
     <string name="ai_status_ready">IA: analizado</string>
     <string name="ai_status_pending">IA: pendiente de análisis</string>
+    <string name="home_app_title">PocketScan</string>
+    <string name="documents_badge">PDF</string>
+    <string name="scanner_align_hint">Alinea el documento dentro del encuadre</string>
+    <string name="scanner_eyebrow">ESCÁNER DE DOCUMENTOS</string>
+    <string name="flash_off">Flash: apagado</string>
+    <string name="flash_on">Flash: encendido</string>
+    <string name="capture">Capturar</string>
+    <string name="delete_last">Eliminar</string>
+    <string name="finish_save_pdf">Finalizar y guardar PDF</string>
+    <string name="pdf_viewer_eyebrow">DOCUMENTO</string>
+    <string name="close">Cerrar</string>
+    <string name="smart_actions_title">ACCIONES INTELIGENTES</string>
+    <string name="ai_badge">IA</string>
+    <string name="ocr_fix">Corregir OCR</string>
+    <string name="export_txt">Exportar TXT</string>
+    <string name="share_pdf">Compartir PDF</string>
+    <string name="ads_label">Publicidad</string>
+    <string name="lock_toggle_failed">No se ha cambiado el bloqueo</string>
+    <string name="biometric_lock_disable">Desactivar bloqueo biométrico</string>
+    <!-- AdMob production banner unit. Placeholder by design: AdsConsentManager falls back to
+         Google's public test unit while this value starts with REPLACE_WITH. Replace before release. -->
+    <string name="admob_banner_unit_id" translatable="false">REPLACE_WITH_PRODUCTION_BANNER_UNIT_ID</string>
     <string name="ai_analysis_started">Análisis IA iniciado.</string>
 </resources>

@@ -11,6 +11,7 @@ import com.google.mlkit.vision.text.devanagari.DevanagariTextRecognizerOptions
 import com.google.mlkit.vision.text.japanese.JapaneseTextRecognizerOptions
 import com.google.mlkit.vision.text.korean.KoreanTextRecognizerOptions
 import java.io.File
+import java.util.concurrent.atomic.AtomicInteger
 
 /** Selects one coherent OCR interpretation per page instead of concatenating scripts. */
 object MultilingualOcr {
@@ -36,7 +37,7 @@ object MultilingualOcr {
             val image = runCatching { InputImage.fromFilePath(context, uris[index]) }.getOrNull()
             if (image == null) { processUri(index + 1); return }
             val candidates = mutableListOf<Candidate>()
-            var remaining = recognizers.size
+            val remaining = AtomicInteger(recognizers.size)
             var finished = false
             fun finishPage() {
                 if (finished) return
@@ -54,7 +55,7 @@ object MultilingualOcr {
                             synchronized(candidates) { candidates.add(Candidate(name, text)) }
                         }
                     }
-                    .addOnCompleteListener { remaining--; if (remaining == 0) finishPage() }
+                    .addOnCompleteListener { if (remaining.decrementAndGet() == 0) finishPage() }
             }
         }
         processUri(0)

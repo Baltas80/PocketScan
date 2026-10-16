@@ -2,8 +2,6 @@
 <resources>
     <string name="app_name">PocketScan</string>
     <string name="tagline">Scannez. Améliorez. Enregistrez. Partagez.</string>
-    <string name="home_headline">Tous vos documents, au même endroit</string>
-    <string name="home_description">Scannez vos reçus, factures et documents. PocketScan les conserve et vous aide à les retrouver rapidement.</string>
     <string name="home_features_title">Tout ce dont vous avez besoin</string>
     <string name="home_features">• Numérisation rapide et précise\n• Extraction intelligente des informations\n• Recherche par texte, OCR, catégorie, date et montant\n• Organisation automatique par catégories\n• Confidentialité et verrouillage biométrique</string>
     <string name="home_privacy">Vos documents restent sous votre contrôle.</string>
@@ -60,4 +58,35 @@
     <string name="ai_status_ready">IA : analysé</string>
     <string name="ai_status_pending">IA : analyse en attente</string>
     <string name="ai_analysis_started">Analyse IA démarrée.</string>
+    <string name="home_eyebrow" translatable="false">DES DOCUMENTS, SANS FRICTION</string>
+    <string name="home_headline">Tous vos documents au même endroit</string>
+    <string name="home_description">Scannez des documents, créez des PDF, extrayez le texte et utilisez l’IA pour comprendre votre contenu quand vous en avez besoin.</string>
+    <string name="home_quick_title">Accès rapides</string>
+    <string name="home_documents_hint">Rechercher et gérer vos PDF</string>
+    <string name="home_ai_hint">Interroger votre bibliothèque</string>
+    <string name="privacy_title">La confidentialité d’abord</string>
+    <string name="privacy_short">Stockage local et verrouillage biométrique.</string>
+    <string name="documents_subtitle">Votre bibliothèque documentaire, claire et facile à consulter.</string>
+    <string name="ai_prompt_label" translatable="false">INTERROGEZ VOTRE BIBLIOTHÈQUE</string>
+    <string name="ai_examples_title">Questions rapides</string>
+    <string name="ai_response_title">Réponse</string>
+    <string name="home_app_title" translatable="false">PocketScan</string>
+    <string name="documents_badge" translatable="false">PDF</string>
+    <string name="scanner_align_hint">Alignez le document dans le cadre</string>
+    <string name="scanner_eyebrow" translatable="false">SCANNER DE DOCUMENTS</string>
+    <string name="flash_off">Flash : éteint</string>
+    <string name="flash_on">Flash : allumé</string>
+    <string name="capture">Capturer</string>
+    <string name="delete_last">Supprimer</string>
+    <string name="finish_save_pdf">Terminer et enregistrer le PDF</string>
+    <string name="pdf_viewer_eyebrow" translatable="false">DOCUMENT</string>
+    <string name="close">Fermer</string>
+    <string name="smart_actions_title" translatable="false">ACTIONS INTELLIGENTES</string>
+    <string name="ai_badge" translatable="false">IA</string>
+    <string name="ocr_fix">Corriger l’OCR</string>
+    <string name="export_txt">Exporter TXT</string>
+    <string name="share_pdf">Partager le PDF</string>
+    <string name="ads_label" translatable="false">Publicité</string>
+    <string name="lock_toggle_failed">Le verrouillage n’a pas pu être modifié</string>
+    <string name="biometric_lock_disable">Désactiver le verrouillage biométrique</string>
 </resources>
