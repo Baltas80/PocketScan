@@ -24,7 +24,7 @@
             <TextView
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
-                android:text="DOCUMENTO"
+                android:text="@string/pdf_viewer_eyebrow"
                 android:textColor="@color/pocketscan_blue"
                 android:textSize="10sp"
                 android:textStyle="bold"
@@ -46,7 +46,7 @@
             style="@style/Widget.Material3.Button.TextButton"
             android:layout_width="wrap_content"
             android:layout_height="48dp"
-            android:text="Cerrar"
+            android:text="@string/close"
             android:textAllCaps="false"
             android:textSize="13sp"
             app:cornerRadius="16dp" />
@@ -67,7 +67,7 @@
             android:layout_height="wrap_content"
             android:layout_marginStart="4dp"
             android:layout_marginBottom="6dp"
-            android:text="ACCIONES INTELIGENTES"
+            android:text="@string/smart_actions_title"
             android:textColor="@color/pocketscan_muted"
             android:textSize="10sp"
             android:textStyle="bold"
@@ -83,7 +83,7 @@
                 android:layout_width="0dp"
                 android:layout_height="50dp"
                 android:layout_weight="1"
-                android:text="IA"
+                android:text="@string/ai_badge"
                 android:textAllCaps="false"
                 android:textStyle="bold"
                 app:cornerRadius="15dp" />
@@ -94,7 +94,7 @@
                 android:layout_height="50dp"
                 android:layout_marginStart="7dp"
                 android:layout_weight="1"
-                android:text="Preguntar"
+                android:text="@string/ask"
                 android:textAllCaps="false"
                 app:cornerRadius="15dp" />
         </LinearLayout>
@@ -110,7 +110,7 @@
                 android:layout_width="0dp"
                 android:layout_height="50dp"
                 android:layout_weight="1"
-                android:text="Corregir OCR"
+                android:text="@string/ocr_fix"
                 android:textAllCaps="false"
                 app:cornerRadius="15dp" />
             <com.google.android.material.button.MaterialButton
@@ -120,7 +120,7 @@
                 android:layout_height="50dp"
                 android:layout_marginStart="7dp"
                 android:layout_weight="1"
-                android:text="Exportar TXT"
+                android:text="@string/export_txt"
                 android:textAllCaps="false"
                 app:cornerRadius="15dp" />
         </LinearLayout>
@@ -131,7 +131,7 @@
             android:layout_width="match_parent"
             android:layout_height="46dp"
             android:layout_marginTop="3dp"
-            android:text="Compartir PDF"
+            android:text="@string/share_pdf"
             android:textAllCaps="false"
             android:textStyle="bold"
             app:cornerRadius="14dp" />

@@ -165,40 +165,13 @@ class SmartScannerActivity : AppCompatActivity() {
         }
     }
 
-    private fun autoNameDocument(pdf: File, text: String): File {
-        val type = when (DocumentOrganizer.categoryForText(text)) {
-            DocumentOrganizer.FACTURAS -> "Factura"
-            DocumentOrganizer.PRESUPUESTOS -> "Presupuesto"
-            DocumentOrganizer.CONTRATOS -> "Contrato"
-            DocumentOrganizer.RECIBOS -> "Recibo"
-            DocumentOrganizer.TICKETS -> "Ticket"
-            DocumentOrganizer.NOMINAS -> "Nomina"
-            DocumentOrganizer.CERTIFICADOS -> "Certificado"
-            DocumentOrganizer.INFORMES -> "Informe"
-            DocumentOrganizer.CITAS -> "Cita"
-            else -> "Documento"
-        }
-        val useful = text.lines().map { it.trim() }.firstOrNull { it.length >= 4 && !it.matches(Regex("[0-9 ./:-]+")) && !it.equals(type, true) }
-        val clean = sanitizeFileName(useful ?: type).take(45).trim().trim('.', '_', '-')
-        val base = sanitizeFileName("$type - $clean").take(80).trim().ifEmpty { "Documento" }
-        var target = File(pdf.parentFile, "$base.pdf")
-        var counter = 2
-        while (
-            target.exists() && target.absolutePath != pdf.absolutePath ||
-            File(target.parentFile, target.nameWithoutExtension + ".txt").exists() && File(target.parentFile, target.nameWithoutExtension + ".txt").absolutePath != File(pdf.parentFile, pdf.nameWithoutExtension + ".txt").absolutePath ||
-            File(target.parentFile, target.nameWithoutExtension + ".ai.json").exists() && File(target.parentFile, target.nameWithoutExtension + ".ai.json").absolutePath != File(pdf.parentFile, pdf.nameWithoutExtension + ".ai.json").absolutePath
-        ) {
-            target = File(pdf.parentFile, "$base ($counter).pdf")
-            counter++
-        }
-        return if (target.absolutePath == pdf.absolutePath || pdf.renameTo(target)) target else pdf
-    }
+    private fun autoNameDocument(pdf: File, text: String): File =
+        DocumentOrganizer.uniqueRenamedDocument(
+            pdf,
+            DocumentOrganizer.suggestDocumentName(text, DocumentOrganizer.categoryForText(text))
+        )
 
-    private fun sanitizeFileName(value: String): String =
-        java.text.Normalizer.normalize(value, java.text.Normalizer.Form.NFD)
-            .replace("\\p{InCombiningDiacriticalMarks}+".toRegex(), "")
-            .replace(Regex("[^A-Za-z0-9 _()-]"), "_")
-            .replace(Regex("\\s+"), " ").trim()
+    private fun sanitizeFileName(value: String): String = DocumentOrganizer.sanitizeFileName(value)
 
     private fun runOcr(
         uris: List<Uri>,

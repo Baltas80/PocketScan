@@ -9,10 +9,21 @@ import com.google.android.ump.ConsentInformation
 import com.google.android.ump.ConsentRequestParameters
 import com.google.android.ump.UserMessagingPlatform
 
-/** Handles EU consent before requesting AdMob ads. Uses Google's demo unit during development. */
+/**
+ * Handles EU consent before requesting AdMob ads.
+ *
+ * Production ad unit: reads `@string/admob_banner_unit_id` (manifest placeholder). While the value
+ * is still a placeholder, Google's public test unit is used so no real traffic is generated.
+ * Before release, replace the placeholder in `values/strings.xml` with the real production unit ID.
+ */
 object AdsConsentManager {
     private const val TEST_BANNER_AD_UNIT = "ca-app-pub-3940256099942544/9214589741"
     private var initialized = false
+
+    private fun bannerUnitId(activity: Activity): String {
+        val configured = activity.getString(R.string.admob_banner_unit_id).trim()
+        return if (configured.isEmpty() || configured.startsWith("REPLACE_WITH")) TEST_BANNER_AD_UNIT else configured
+    }
 
     fun prepare(activity: Activity, container: android.widget.FrameLayout) {
         val consentInformation = UserMessagingPlatform.getConsentInformation(activity)
@@ -52,7 +63,7 @@ object AdsConsentManager {
             val density = activity.resources.displayMetrics.density
             val widthDp = (widthPx / density).toInt()
             val adView = AdView(activity)
-            adView.adUnitId = TEST_BANNER_AD_UNIT
+            adView.adUnitId = bannerUnitId(activity)
             adView.setAdSize(AdSize.getCurrentOrientationAnchoredAdaptiveBannerAdSize(activity, widthDp))
             container.addView(
                 adView,

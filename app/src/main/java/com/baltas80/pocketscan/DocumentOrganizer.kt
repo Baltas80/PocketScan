@@ -54,6 +54,65 @@ object DocumentOrganizer {
         return if (categories.contains(first)) first else GENERAL
     }
 
+    /** Shared filename sanitizer: strips accents and unsafe characters. Used by all scanners and the library. */
+    fun sanitizeFileName(value: String): String {
+        val withoutAccents = Normalizer.normalize(value, Normalizer.Form.NFD)
+            .replace("\\p{InCombiningDiacriticalMarks}+".toRegex(), "")
+        return withoutAccents
+            .replace(Regex("[^A-Za-z0-9 _()-]"), "_")
+            .replace(Regex("\\s+"), " ")
+            .trim()
+    }
+
+    /** Maps a document category to its human-readable name prefix for auto-generated filenames. */
+    fun typeName(category: String, fallback: String = "Documento"): String = when (category) {
+        FACTURAS -> "Factura"
+        PRESUPUESTOS -> "Presupuesto"
+        CONTRATOS -> "Contrato"
+        RECIBOS -> "Recibo"
+        TICKETS -> "Ticket"
+        NOMINAS -> "Nomina"
+        CERTIFICADOS -> "Certificado"
+        INFORMES -> "Informe"
+        CITAS -> "Cita"
+        else -> fallback
+    }
+
+    /**
+     * Builds an automatic "Type - First meaningful line" name from OCR text, sanitized and length-bounded.
+     * Single shared implementation so every scan/import path names documents identically.
+     */
+    fun suggestDocumentName(text: String, category: String): String {
+        val type = typeName(category)
+        val usefulLine = text.lines().map { it.trim() }.firstOrNull { line ->
+            line.length >= 4 && !line.matches(Regex("[0-9 ./:-]+")) && !line.equals(type, ignoreCase = true)
+        } ?: type
+        val cleanLine = sanitizeFileName(usefulLine).take(45).trim().trim('.', '_', '-')
+        return sanitizeFileName(if (cleanLine.length >= 4) "$type - $cleanLine" else type)
+            .take(80).trim().ifEmpty { "Documento" }
+    }
+
+    /**
+     * Picks a collision-free target for `pdf` in its directory, considering the `.txt` and `.ai.json`
+     * sidecars. Renames the PDF and returns the new file; returns `pdf` unchanged if renaming fails.
+     */
+    fun uniqueRenamedDocument(pdf: File, baseName: String): File {
+        val dir = pdf.parentFile ?: return pdf
+        var target = File(dir, "$baseName.pdf")
+        var counter = 2
+        while (
+            target.exists() && target.absolutePath != pdf.absolutePath ||
+            File(dir, target.nameWithoutExtension + ".txt").exists() &&
+                File(dir, target.nameWithoutExtension + ".txt").absolutePath != File(dir, pdf.nameWithoutExtension + ".txt").absolutePath ||
+            File(dir, target.nameWithoutExtension + ".ai.json").exists() &&
+                File(dir, target.nameWithoutExtension + ".ai.json").absolutePath != File(dir, pdf.nameWithoutExtension + ".ai.json").absolutePath
+        ) {
+            target = File(dir, "$baseName ($counter).pdf")
+            counter++
+        }
+        return if (target.absolutePath == pdf.absolutePath || pdf.renameTo(target)) target else pdf
+    }
+
     fun directory(scansDir: File, category: String): File =
         File(scansDir, if (categories.contains(category)) category else GENERAL).apply { mkdirs() }
 

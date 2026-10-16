@@ -62,13 +62,6 @@ object AiMetadataStore {
         )
     }.getOrNull()
 
-    private fun normalizeCurrency(value: String): String = when (value.uppercase()) {
-        "€", "EUR" -> "EUR"
-        "$", "USD" -> "USD"
-        "£", "GBP" -> "GBP"
-        else -> value
-    }
-
     fun delete(document: File): Boolean = runCatching {
         val sidecar = sidecarFor(document)
         val temp = File(sidecar.parentFile ?: document, sidecar.name + ".tmp")

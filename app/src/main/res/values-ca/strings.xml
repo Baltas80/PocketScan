@@ -2,10 +2,12 @@
 <resources>
     <string name="app_name">PocketScan</string>
     <string name="tagline">Escaneja. Millora. Desa. Comparteix.</string>
-    <string name="home_headline">Tots els teus documents, en un sol lloc</string>
-    <string name="home_description">Escaneja tiquets, factures i documents. PocketScan els desa i t’ajuda a trobar-los ràpidament.</string>
     <string name="home_features_title">Tot el que necessites</string>
-    <string name="home_features">• Escaneig ràpid i precís\n• Extracció intel·ligent d’informació\n• Cerca per text, OCR, categoria, data i import\n• Organització automàtica per categories\n• Privacitat i bloqueig biomètric</string>
+    <string name="home_features">• Escaneig ràpid i precís
+• Extracció intel·ligent d’informació
+• Cerca per text, OCR, categoria, data i import
+• Organització automàtica per categories
+• Privacitat i bloqueig biomètric</string>
     <string name="home_privacy">Els teus documents continuen sota el teu control.</string>
     <string name="scan_document">Escanejar document</string>
     <string name="my_documents">Els meus documents</string>
@@ -60,4 +62,35 @@
     <string name="ai_status_ready">IA: analitzada</string>
     <string name="ai_status_pending">IA: anàlisi pendent</string>
     <string name="ai_analysis_started">Anàlisi d’IA iniciada.</string>
+    <string name="home_headline">Tots els teus documents, en un sol lloc</string>
+    <string name="home_description">Escaneja documents, crea PDF, extreu text i utilitza la IA per entendre el teu contingut quan el necessitis.</string>
+    <string name="home_quick_title">Accessos ràpids</string>
+    <string name="home_documents_hint">Cerca i gestiona els teus PDF</string>
+    <string name="home_ai_hint">Pregunta a la teva biblioteca</string>
+    <string name="privacy_title">Privadesa primer</string>
+    <string name="privacy_short">Emmagatzematge local i bloqueig biomètric.</string>
+    <string name="documents_subtitle">La teva biblioteca documental, neta i fàcil de consultar.</string>
+    <string name="ai_examples_title">Preguntes ràpides</string>
+    <string name="ai_response_title">Resposta</string>
+    <string name="scanner_align_hint">Alinea el document dins del marc</string>
+    <string name="flash_off">Flash: apagat</string>
+    <string name="flash_on">Flash: encès</string>
+    <string name="capture">Capturar</string>
+    <string name="delete_last">Eliminar</string>
+    <string name="finish_save_pdf">Finalitzar i desar PDF</string>
+    <string name="close">Tancar</string>
+    <string name="ocr_fix">Corregir OCR</string>
+    <string name="export_txt">Exportar TXT</string>
+    <string name="share_pdf">Compartir PDF</string>
+    <string name="lock_toggle_failed">No s’ha canviat el bloqueig</string>
+    <string name="biometric_lock_disable">Desactivar bloqueig biomètric</string>
+    <string name="ads_label">Publicitat</string>
+    <string name="ai_analysis_title">Anàlisi intel·ligent</string>
+    <string name="ask_about_document">Preguntar sobre aquest document</string>
+    <string name="smart_actions_title">ACCIONS INTEL·LIGENTS</string>
+    <string name="home_app_title">PocketScan</string>
+    <string name="documents_badge">PDF</string>
+    <string name="ai_badge">IA</string>
+    <string name="pdf_viewer_eyebrow">DOCUMENTO</string>
+    <string name="scanner_eyebrow">ESCÁNER DE DOCUMENTOS</string>
 </resources>

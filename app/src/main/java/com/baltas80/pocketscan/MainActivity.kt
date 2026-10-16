@@ -19,7 +19,7 @@ class MainActivity : AppCompatActivity() {
         lockButton.setOnClickListener {
             AppLockManager.toggle(this) { success ->
                 if (success) updateLockButton()
-                else Toast.makeText(this, "No se ha cambiado el bloqueo", Toast.LENGTH_SHORT).show()
+                else Toast.makeText(this, R.string.lock_toggle_failed, Toast.LENGTH_SHORT).show()
             }
         }
         updateLockButton()
@@ -33,6 +33,6 @@ class MainActivity : AppCompatActivity() {
     }
 
     private fun updateLockButton() {
-        lockButton.text = if (AppLockManager.isEnabled(this)) "Desactivar bloqueo biométrico" else "Activar bloqueo biométrico"
+        lockButton.setText(if (AppLockManager.isEnabled(this)) R.string.biometric_lock_disable else R.string.biometric_lock)
     }
 }

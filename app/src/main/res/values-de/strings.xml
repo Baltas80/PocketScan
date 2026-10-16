@@ -2,8 +2,6 @@
 <resources>
     <string name="app_name">PocketScan</string>
     <string name="tagline">Scannen. Verbessern. Speichern. Teilen.</string>
-    <string name="home_headline">Alle deine Dokumente an einem Ort</string>
-    <string name="home_description">Scanne Belege, Rechnungen und Dokumente. PocketScan bewahrt sie auf und hilft dir, sie schnell zu finden.</string>
     <string name="home_features_title">Alles, was du brauchst</string>
     <string name="home_features">• Schnelles, präzises Scannen\n• Intelligente Informationserfassung\n• Suche nach Text, OCR, Kategorie, Datum und Betrag\n• Automatische Organisation nach Kategorien\n• Datenschutz und biometrische Sperre</string>
     <string name="home_privacy">Deine Dokumente bleiben unter deiner Kontrolle.</string>
@@ -60,4 +58,35 @@
     <string name="ai_status_ready">KI: analysiert</string>
     <string name="ai_status_pending">KI: Analyse ausstehend</string>
     <string name="ai_analysis_started">KI-Analyse gestartet.</string>
+    <string name="home_headline">Alle Ihre Dokumente an einem Ort</string>
+    <string name="home_description">Scannen Sie Dokumente, erstellen Sie PDFs, extrahieren Sie Text und nutzen Sie KI, um Ihre Inhalte bei Bedarf zu verstehen.</string>
+    <string name="home_quick_title">Schnellzugriff</string>
+    <string name="home_documents_hint">PDFs durchsuchen und verwalten</string>
+    <string name="home_ai_hint">Fragen Sie Ihre Bibliothek</string>
+    <string name="privacy_title">Datenschutz zuerst</string>
+    <string name="privacy_short">Lokale Speicherung und biometrische Sperre.</string>
+    <string name="documents_subtitle">Ihre Dokumentenbibliothek, übersichtlich und leicht abfragbar.</string>
+    <string name="ai_examples_title">Schnelle Fragen</string>
+    <string name="ai_response_title">Antwort</string>
+    <string name="scanner_align_hint">Richten Sie das Dokument im Rahmen aus</string>
+    <string name="flash_off">Blitz: aus</string>
+    <string name="flash_on">Blitz: an</string>
+    <string name="capture">Aufnehmen</string>
+    <string name="delete_last">Löschen</string>
+    <string name="finish_save_pdf">Fertigstellen und PDF speichern</string>
+    <string name="close">Schließen</string>
+    <string name="ocr_fix">OCR korrigieren</string>
+    <string name="export_txt">TXT exportieren</string>
+    <string name="share_pdf">PDF teilen</string>
+    <string name="lock_toggle_failed">Die Sperre konnte nicht geändert werden</string>
+    <string name="biometric_lock_disable">Biometrische Sperre deaktivieren</string>
+    <string name="ads_label">Werbung</string>
+    <string name="ai_analysis_title">Intelligente Analyse</string>
+    <string name="ask_about_document">Zu diesem Dokument fragen</string>
+    <string name="smart_actions_title">SMART AKTIONEN</string>
+    <string name="home_app_title">PocketScan</string>
+    <string name="documents_badge">PDF</string>
+    <string name="ai_badge">IA</string>
+    <string name="pdf_viewer_eyebrow">DOCUMENTO</string>
+    <string name="scanner_eyebrow">ESCÁNER DE DOCUMENTOS</string>
 </resources>
